@@ -1,9 +1,9 @@
 import streamlit as st
 from app import chain
 
-st.set_page_config(page_title="Mortgage")
+st.set_page_config(page_title="Mortgage Assistant")
 
-st.title("Mortgage")
+st.title("Mortgage Assistant")
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -28,7 +28,11 @@ if prompt := st.chat_input("Ask questions"):
     with st.spinner("Loading..."):
         with st.chat_message("assistant"):
             response = chain.invoke({"input": prompt},
-                                    config={"configurable": {"session_id": "zzz"}})
-            st.markdown(response['answer'])
+                                    config={"configurable": {"session_id": "zzz8"}})
+
+            content = response.get('answer') or response.get('result')
+
+            st.markdown(content)
+
     st.session_state.messages.append(
-        {"role": "assistant", "content": response['answer']})
+        {"role": "assistant", "content": content})

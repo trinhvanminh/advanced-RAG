@@ -1,14 +1,13 @@
 import os
 
-from langchain.chains import create_history_aware_retriever
-from langchain.chains.combine_documents.stuff import \
-    create_stuff_documents_chain
+from langchain.chains.combine_documents.stuff import create_stuff_documents_chain
+from langchain.chains.history_aware_retriever import create_history_aware_retriever
 from langchain.chains.retrieval import create_retrieval_chain
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain_cohere import CohereRerank
-from langchain_community.document_loaders import (PyMuPDFLoader, PyPDFLoader,
-                                                  TextLoader,
-                                                  UnstructuredExcelLoader)
+from langchain_community.document_loaders import (PyMuPDFLoader, TextLoader,
+                                                  UnstructuredExcelLoader,
+                                                  UnstructuredMarkdownLoader)
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_mongodb import MongoDBAtlasVectorSearch
@@ -36,20 +35,11 @@ system_prompt = (
     "Use the following pieces of retrieved context to answer "
     "the question. If you don't know the answer, say that you "
     "don't know. Answer the question and provide additional helpful information, "
-    "based on the pieces of information, if applicable. Be succinct."
+    "based on the pieces of information, if applicable."
     "\n\n"
     "{context}"
     "\n\n"
     "Responses should be properly formatted to be easily read.."
-)
-
-
-qa_prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system_prompt),
-        MessagesPlaceholder("chat_history"),
-        ("human", "{input}"),
-    ]
 )
 
 
@@ -111,7 +101,6 @@ class RAG():
 
     @property
     def rag_chain(self):
-
         history_aware_retriever = create_history_aware_retriever(
             self.llm, self.retriever, contextualize_q_prompt)
 
@@ -152,6 +141,8 @@ class RAG():
 
             if file.endswith('.pdf'):
                 loader = PyMuPDFLoader(file_path)
+            elif file.endswith('.md'):
+                loader = UnstructuredMarkdownLoader(file_path)
             elif file.endswith('.xlsx'):
                 loader = UnstructuredExcelLoader(file_path)
             elif file.endswith('.txt'):
