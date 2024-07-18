@@ -158,8 +158,9 @@ class RAG():
 
             documents.extend(loader.load())
 
+        # TODO: dynamic the chunk_size (recommended increase to 2048:128)
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, chunk_overlap=150, **text_splitter_kwargs)
+            chunk_size=2048, chunk_overlap=128, **text_splitter_kwargs)
 
         chunked_documents = text_splitter.split_documents(documents)
 
