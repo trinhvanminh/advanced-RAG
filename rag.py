@@ -39,7 +39,15 @@ system_prompt = (
     "\n\n"
     "{context}"
     "\n\n"
-    "Responses should be properly formatted to be easily read.."
+    "IMPORTANT: Responses should be properly formatted to be easily read. MARKDOWN list syntax is recommended for long answer"
+)
+
+qa_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", system_prompt),
+        MessagesPlaceholder("chat_history"),
+        ("human", "{input}"),
+    ]
 )
 
 

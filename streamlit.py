@@ -15,6 +15,24 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# TODO: dynamic LLM and list all previous chat
+# Can delete chat
+# Can create new chat
+with st.sidebar:
+
+    add_radio = st.selectbox(
+        "Choose a LLM",
+        ("Gemini (1.5-pro)", "Cohere (command-r)", "Groq (llama3-70b-8192)")
+    )
+
+    st.button("New chat")
+
+    st.write("Previous chat")
+    with st.container(height=640, border=False):
+        st.markdown("Item 1")
+        st.markdown("Item 2")
+        st.markdown("Item 3"*1000)
+
 
 # Accept user input
 if prompt := st.chat_input("Ask questions"):
@@ -27,8 +45,9 @@ if prompt := st.chat_input("Ask questions"):
     # Display assistant response in chat message container
     with st.spinner("Loading..."):
         with st.chat_message("assistant"):
+            # TODO: dynamic session id
             response = chain.invoke({"input": prompt},
-                                    config={"configurable": {"session_id": "zzz8"}})
+                                    config={"configurable": {"session_id": "zzz12"}})
 
             content = response.get('answer') or response.get('result')
 
