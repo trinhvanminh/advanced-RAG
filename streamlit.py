@@ -1,7 +1,7 @@
 import uuid
 import streamlit as st
 from app import rag
-from constants import llm_map
+from constants import llm_map, llm_label_map
 from langchain_core.messages.human import HumanMessage
 from langchain_core.messages.ai import AIMessage
 
@@ -63,7 +63,7 @@ if "temp_session_id" not in st.session_state:
     st.session_state.temp_session_id = ''
 
 if "model" not in st.session_state:
-    st.session_state.model = 'Gemini (1.5-pro)'
+    st.session_state.model = 'cohere'
 
 
 # Display chat messages from history on app rerun
@@ -75,7 +75,9 @@ with st.sidebar:
 
     model = st.selectbox(
         "Choose a LLM",
-        ("Gemini (1.5-pro)", "Cohere (command-r)", "Groq (llama3-70b-8192)")
+        ("gemini", "cohere", "groq"),
+        format_func=lambda option: llm_label_map[option],
+        index=1
     )
 
     st.session_state.model = model
