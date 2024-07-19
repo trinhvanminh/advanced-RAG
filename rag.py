@@ -1,7 +1,9 @@
 import os
 
-from langchain.chains.combine_documents.stuff import create_stuff_documents_chain
-from langchain.chains.history_aware_retriever import create_history_aware_retriever
+from langchain.chains.combine_documents.stuff import \
+    create_stuff_documents_chain
+from langchain.chains.history_aware_retriever import \
+    create_history_aware_retriever
 from langchain.chains.retrieval import create_retrieval_chain
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain_cohere import CohereRerank
@@ -61,7 +63,7 @@ class RAG():
                  embedding,
 
                  index_name: str = 'vector_index',
-                 history_collection_name: str = 'history',
+                 history_collection_name: str = 'message_store',
                  search_type: str = 'similarity',
                  search_kwargs: dict = None,
                  rerank: bool = True,
