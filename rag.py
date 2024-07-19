@@ -35,7 +35,7 @@ system_prompt = (
     "Use the following pieces of retrieved context to answer "
     "the question. If you don't know the answer, say that you "
     "don't know. Answer the question and provide additional helpful information, "
-    "based on the pieces of information, if applicable."
+    "based on the pieces of information, if applicable. Be concise."
     "\n\n"
     "{context}"
     "\n\n"
@@ -84,13 +84,15 @@ class RAG():
     def client(self):
         return MongoClient(self.mongodb_uri)
 
-    @property
-    def collection(self):
-        return self.client[self.db_name][self.collection_name]
+    def collection(self, collection_name: str = ''):
+        if collection_name == '':
+            collection_name = self.collection_name
+
+        return self.client[self.db_name][collection_name]
 
     @property
     def vector_store(self) -> MongoDBAtlasVectorSearch:
-        return MongoDBAtlasVectorSearch(collection=self.collection, embedding=self.embedding, index_name=self.index_name)
+        return MongoDBAtlasVectorSearch(collection=self.collection(), embedding=self.embedding, index_name=self.index_name)
 
     @property
     def retriever(self):
@@ -138,9 +140,9 @@ class RAG():
         )
 
     def load_documents(self, folder_path: str = "./data", text_splitter_kwargs: dict = {}) -> MongoDBAtlasVectorSearch:
-        count = self.collection.count_documents({})
+        count = self.collection().count_documents({})
         if count != 0:
-            self.collection.drop()
+            self.collection().drop()
 
         documents = []
 
