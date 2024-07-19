@@ -16,7 +16,6 @@ DB_NAME = os.getenv('DB_NAME')
 COLLECTION_NAME = os.getenv('COLLECTION_NAME') + '.full.2048.128__v4'
 ATLAS_VECTOR_SEARCH_INDEX_NAME = os.getenv('ATLAS_VECTOR_SEARCH_INDEX_NAME')
 
-print('COLLECTION_NAME', COLLECTION_NAME)
 # llm = GoogleGenerativeAI(model='gemini-1.5-pro', temperature=0)
 
 llm = ChatCohere(model="command-r", temperature=0)
