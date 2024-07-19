@@ -14,6 +14,10 @@ def delete_chat(session_id: str):
     session_history = rag.get_session_history(session_id=session_id)
     session_history.clear()
 
+    if session_id == st.session_state.selected_session_id:
+        st.session_state.selected_session_id = ''
+        st.session_state.messages = []
+
 
 def _parse_llm_messages(messages: list[HumanMessage | AIMessage]):
     parsed_messages = []
@@ -32,15 +36,12 @@ def _parse_llm_messages(messages: list[HumanMessage | AIMessage]):
 
 
 def load_messages(session_id: str):
-    print("load_messages", session_id)
     session_history = rag.get_session_history(session_id=session_id)
     parsed_messages = _parse_llm_messages(session_history.messages)
-    print("parsed_messages", parsed_messages)
     st.session_state.messages = parsed_messages
 
 
 def select_chat(session_id: str):
-    print("select_chat", session_id)
     st.session_state.selected_session_id = session_id
     load_messages(session_id)
 
@@ -72,7 +73,6 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 with st.sidebar:
-
     model = st.selectbox(
         "Choose a LLM",
         ("gemini", "cohere", "groq"),
@@ -100,6 +100,7 @@ with st.sidebar:
         #     select_chat(session_ids[0])
 
         # display chats
+        st.markdown(session_ids)
         sorted_session_ids = sorted(
             session_ids, key=lambda x: uuid.UUID(x).time, reverse=True)
         for session_id in sorted_session_ids:
@@ -110,7 +111,7 @@ with st.sidebar:
             with label_col:
                 label_btn = label_col.button(
                     session_id[:8] + "..." + session_id[-8:],
-                    key=session_id,
+                    key=f'label_btn.{session_id}',
                     use_container_width=True,
                     on_click=select_chat,
                     kwargs={"session_id": session_id},
@@ -120,17 +121,17 @@ with st.sidebar:
             with action_col:
                 delete_btn = action_col.button(
                     "🗑️",
-                    key=f'delete_btn{session_id}',
+                    key=f'delete_btn.{session_id}',
                     use_container_width=True,
                     on_click=delete_chat,
                     kwargs={"session_id": session_id}
                 )
 
-
 # Accept user input
 if prompt := st.chat_input("Ask questions"):
     # Add user message to chat history
     st.session_state.messages.append({"role": "user", "content": prompt})
+
     # Display user message in chat message container
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -142,14 +143,15 @@ if prompt := st.chat_input("Ask questions"):
             chain = rag.conversational_rag_chain
             response = chain.invoke(
                 input={"input": prompt},
-                config={"configurable": {
-                    "session_id": st.session_state.selected_session_id}}
+                config={
+                    "configurable": {
+                        "session_id": st.session_state.selected_session_id,
+                    }
+                },
             )
 
             content = response.get('answer') or response.get('result')
 
             st.markdown(content)
 
-    load_messages(st.session_state.selected_session_id)
-    # st.session_state.messages.append(
-    #     {"role": "assistant", "content": content})
+    st.session_state.messages.append({"role": "assistant", "content": content})
