@@ -1,9 +1,10 @@
-import uuid
 import streamlit as st
-from app import rag
-from constants import llm_map, llm_label_map
-from langchain_core.messages.human import HumanMessage
+from bson.objectid import ObjectId
 from langchain_core.messages.ai import AIMessage
+from langchain_core.messages.human import HumanMessage
+
+from app import rag
+from constants import llm_label_map, llm_map
 
 st.set_page_config(page_title="Mortgage Assistant")
 
@@ -74,37 +75,32 @@ with st.sidebar:
     st.write("Previous chat")
 
     with st.container(height=640, border=False):
-        # list all history
-        session_ids = st.session_state.conversations
+        # list all conversations
+        conversations = st.session_state.conversations
+        conversations.sort(key=lambda x: str(x), reverse=True)
 
-        # TODO: sort by timestamp
-        # display chats
-        #  sorted_session_ids = sorted(
-        #     session_ids, key=lambda x: uuid.UUID(x).time, reverse=True)
-
-        sorted_session_ids = session_ids
-        for session_id in sorted_session_ids:
+        for conversation in conversations:
             label_col, action_col = st.columns([6, 1])
 
-            label_btn_type = "primary" if session_id == st.session_state.selected_conversation else 'secondary'
+            label_btn_type = "primary" if conversation == st.session_state.selected_conversation else 'secondary'
 
             with label_col:
                 label_col.button(
-                    session_id[:8] + "..." + session_id[-8:],
-                    key=f'label_btn.{session_id}',
+                    str(conversation)[:8] + "..." + str(conversation)[-8:],
+                    key=f'label_btn.{conversation}',
                     use_container_width=True,
                     on_click=select_chat,
-                    kwargs={"session_id": session_id},
+                    kwargs={"session_id": conversation},
                     type=label_btn_type
                 )
 
             with action_col:
                 action_col.button(
                     "🗑️",
-                    key=f'delete_btn.{session_id}',
+                    key=f'delete_btn.{conversation}',
                     use_container_width=True,
                     on_click=delete_chat,
-                    kwargs={"session_id": session_id}
+                    kwargs={"session_id": conversation}
                 )
 
 
@@ -129,21 +125,20 @@ if prompt := st.chat_input("Ask questions"):
             rag.llm = llm_map.get(st.session_state.model)
             chain = rag.conversational_rag_chain
 
-            session_id = st.session_state.selected_conversation or str(
-                uuid.uuid4())
+            conversation = st.session_state.selected_conversation or ObjectId()
 
             response = chain.invoke(
                 input={"input": prompt},
                 config={
                     "configurable": {
-                        "session_id": session_id,
+                        "session_id": conversation,
                     }
                 },
             )
 
-            if session_id not in st.session_state.conversations:
-                st.session_state.conversations.append(session_id)
-                st.session_state.selected_conversation = session_id
+            if conversation not in st.session_state.conversations:
+                st.session_state.conversations.append(conversation)
+                st.session_state.selected_conversation = conversation
                 st.rerun()
 
             content = response.get('answer')
