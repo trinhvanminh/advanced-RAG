@@ -1,10 +1,9 @@
 import streamlit as st
-from bson.objectid import ObjectId
-from langchain_core.messages.ai import AIMessage
-from langchain_core.messages.human import HumanMessage
-
 from app import rag
-from constants import llm_label_map, llm_map
+from constants import llm_map, llm_label_map
+from langchain_core.messages.human import HumanMessage
+from langchain_core.messages.ai import AIMessage
+from bson.objectid import ObjectId
 
 st.set_page_config(page_title="Mortgage Assistant")
 
@@ -78,20 +77,28 @@ with st.sidebar:
         # list all conversations
         conversations = st.session_state.conversations
         conversations.sort(key=lambda x: str(x), reverse=True)
-
+        import pytz
         for conversation in conversations:
             label_col, action_col = st.columns([6, 1])
 
-            label_btn_type = "primary" if conversation == st.session_state.selected_conversation else 'secondary'
-
             with label_col:
+                # label type for active/inactive conversation
+                label_btn_type = "primary" if conversation == st.session_state.selected_conversation else 'secondary'
+
+                # label tooltip
+                now_utc = conversation.generation_time
+                est_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+                created_at = now_utc.astimezone(est_tz).strftime("%d/%m/%y %X")
+
+                # label as button
                 label_col.button(
                     str(conversation)[:8] + "..." + str(conversation)[-8:],
                     key=f'label_btn.{conversation}',
                     use_container_width=True,
                     on_click=select_chat,
                     kwargs={"session_id": conversation},
-                    type=label_btn_type
+                    type=label_btn_type,
+                    help=created_at
                 )
 
             with action_col:
