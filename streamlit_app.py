@@ -64,7 +64,7 @@ if "model" not in st.session_state:
 with st.sidebar:
     model = st.selectbox(
         "Choose a LLM",
-        tuple(llm_map.keys()),
+        tuple(llm_label_map.keys()),
         format_func=lambda option: llm_label_map[option],
         index=1
     )
