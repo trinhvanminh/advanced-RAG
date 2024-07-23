@@ -2,12 +2,9 @@ from langchain_cohere import ChatCohere
 import os
 
 from dotenv import load_dotenv
-from langchain_google_genai import (GoogleGenerativeAI,
-                                    GoogleGenerativeAIEmbeddings)
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 from rag import RAG
-
-from langchain_groq import ChatGroq
 
 load_dotenv()
 
@@ -16,12 +13,8 @@ DB_NAME = os.getenv('DB_NAME')
 COLLECTION_NAME = os.getenv('COLLECTION_NAME') + '.full.2048.128__v4'
 ATLAS_VECTOR_SEARCH_INDEX_NAME = os.getenv('ATLAS_VECTOR_SEARCH_INDEX_NAME')
 
-# llm = GoogleGenerativeAI(model='gemini-1.5-pro', temperature=0)
-
+# default llm
 llm = ChatCohere(model="command-r", temperature=0)
-
-# llm = ChatGroq(temperature=0, model_name="llama3-70b-8192")
-
 
 embedding = GoogleGenerativeAIEmbeddings(model='models/text-embedding-004')
 
