@@ -1,7 +1,9 @@
 import os
 
-from langchain.chains.combine_documents.stuff import create_stuff_documents_chain
-from langchain.chains.history_aware_retriever import create_history_aware_retriever
+from langchain.chains.combine_documents.stuff import \
+    create_stuff_documents_chain
+from langchain.chains.history_aware_retriever import \
+    create_history_aware_retriever
 from langchain.chains.retrieval import create_retrieval_chain
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain_cohere import CohereRerank
@@ -35,11 +37,19 @@ system_prompt = (
     "Use the following pieces of retrieved context to answer "
     "the question. If you don't know the answer, say that you "
     "don't know. Answer the question and provide additional helpful information, "
-    "based on the pieces of information, if applicable."
+    "based on the pieces of information, if applicable. Be concise."
     "\n\n"
     "{context}"
     "\n\n"
-    "Responses should be properly formatted to be easily read.."
+    "IMPORTANT: Responses should be properly formatted to be easily read. MARKDOWN list syntax is recommended for long answer"
+)
+
+qa_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", system_prompt),
+        MessagesPlaceholder("chat_history"),
+        ("human", "{input}"),
+    ]
 )
 
 
@@ -53,7 +63,7 @@ class RAG():
                  embedding,
 
                  index_name: str = 'vector_index',
-                 history_collection_name: str = 'history',
+                 history_collection_name: str = 'message_store',
                  search_type: str = 'similarity',
                  search_kwargs: dict = None,
                  rerank: bool = True,
@@ -76,13 +86,15 @@ class RAG():
     def client(self):
         return MongoClient(self.mongodb_uri)
 
-    @property
-    def collection(self):
-        return self.client[self.db_name][self.collection_name]
+    def collection(self, collection_name: str = ''):
+        if collection_name == '':
+            collection_name = self.collection_name
+
+        return self.client[self.db_name][collection_name]
 
     @property
     def vector_store(self) -> MongoDBAtlasVectorSearch:
-        return MongoDBAtlasVectorSearch(collection=self.collection, embedding=self.embedding, index_name=self.index_name)
+        return MongoDBAtlasVectorSearch(collection=self.collection(), embedding=self.embedding, index_name=self.index_name)
 
     @property
     def retriever(self):
@@ -130,9 +142,9 @@ class RAG():
         )
 
     def load_documents(self, folder_path: str = "./data", text_splitter_kwargs: dict = {}) -> MongoDBAtlasVectorSearch:
-        count = self.collection.count_documents({})
+        count = self.collection().count_documents({})
         if count != 0:
-            self.collection.drop()
+            self.collection().drop()
 
         documents = []
 
@@ -150,8 +162,9 @@ class RAG():
 
             documents.extend(loader.load())
 
+        # TODO: dynamic the chunk_size (recommended increase to 2048:128)
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, chunk_overlap=150, **text_splitter_kwargs)
+            chunk_size=2048, chunk_overlap=128, **text_splitter_kwargs)
 
         chunked_documents = text_splitter.split_documents(documents)
 
