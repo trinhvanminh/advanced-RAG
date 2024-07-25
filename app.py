@@ -1,3 +1,4 @@
+import httpx
 import pytz
 import streamlit as st
 from bson.objectid import ObjectId
@@ -44,8 +45,8 @@ def create_chat():
 
 
 def main():
-    st.title("Mortgage Assistant")
     st.set_page_config(page_title="Mortgage Assistant")
+    st.title("Mortgage Assistant")
 
     qa = QnA(
         embeddings=cfg.embeddings,
@@ -95,6 +96,11 @@ def main():
                     # label type for active/inactive conversation
                     label_btn_type = "primary" if conversation == st.session_state.selected_conversation else 'secondary'
 
+                    if not isinstance(conversation, ObjectId):
+                        # delete_chat(qa, conversation)
+                        raise ValueError(
+                            "Invalid `SessionId`, Expected: %s, Got: %s" % (ObjectId, type(conversation)))
+
                     # label tooltip
                     now_utc = conversation.generation_time
                     est_tz = pytz.timezone('Asia/Ho_Chi_Minh')
@@ -107,7 +113,7 @@ def main():
                         key=f'label_btn.{conversation}',
                         use_container_width=True,
                         on_click=select_chat,
-                        kwargs={"session_id": conversation},
+                        kwargs={"qa": qa, "session_id": conversation},
                         type=label_btn_type,
                         help=created_at
                     )
@@ -143,19 +149,25 @@ def main():
 
                 conversation = st.session_state.selected_conversation or ObjectId()
 
-                response = qa.ask_question(
-                    query=prompt,
-                    session_id=conversation
-                )
+                try:
+                    response = qa.ask_question(
+                        query=prompt,
+                        session_id=conversation
+                    )
 
-                if conversation not in st.session_state.conversations:
-                    st.session_state.conversations.append(conversation)
-                    st.session_state.selected_conversation = conversation
-                    st.rerun()
+                    if conversation not in st.session_state.conversations:
+                        st.session_state.conversations.append(conversation)
+                        st.session_state.selected_conversation = conversation
+                        st.rerun()
 
-                content = response.get('answer')
+                    content = response.get('answer')
 
-                st.markdown(content)
+                    st.markdown(content)
+
+                except httpx.ConnectError:
+                    st.warning(
+                        f"Check your {st.session_state.model} connection")
+                    return
 
         st.session_state.messages.append(
             {"role": "assistant", "content": content})
