@@ -1,64 +1,165 @@
-from langchain_cohere import ChatCohere
-import os
+import pytz
+import streamlit as st
+from bson.objectid import ObjectId
+from langchain_core.messages.ai import AIMessage
+from langchain_core.messages.human import HumanMessage
 
-from dotenv import load_dotenv
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-
-from rag import RAG
-
-load_dotenv()
-
-MONGODB_CONNECTION_STRING = os.getenv('MONGODB_CONNECTION_STRING')
-DB_NAME = os.getenv('DB_NAME')
-COLLECTION_NAME = os.getenv('COLLECTION_NAME') + '.full.2048.128__v4'
-ATLAS_VECTOR_SEARCH_INDEX_NAME = os.getenv('ATLAS_VECTOR_SEARCH_INDEX_NAME')
-
-# default llm
-llm = ChatCohere(model="command-r", temperature=0)
-
-embedding = GoogleGenerativeAIEmbeddings(model='models/text-embedding-004')
-
-rag = RAG(
-    db_name=DB_NAME,
-    collection_name=COLLECTION_NAME,
-    mongodb_uri=MONGODB_CONNECTION_STRING,
-    index_name=ATLAS_VECTOR_SEARCH_INDEX_NAME,
-    llm=llm,
-    embedding=embedding
-)
+import src.config as cfg
+from src.qna import QnA
 
 
-# history_collection = rag.collection('history')
-# results = history_collection.distinct("SessionId")
+def delete_chat(qa: QnA, session_id: str):
+    session_history = qa.get_session_history(session_id=session_id)
+    session_history.clear()
 
-# print(results)
+    st.session_state.messages = []
+    st.session_state.conversations = list(
+        filter(
+            lambda x: x != session_id,
+            st.session_state.conversations
+        )
+    )
 
-# print(rag.retriever.invoke("What is the maximum loan term I can get?"))
+    if session_id == st.session_state.selected_conversation:
+        st.session_state.selected_conversation = ''
 
-# rag.collection.drop()
-# count = rag.collection().count_documents({})
 
-# if count == 0:
-#     rag.load_documents(folder_path="./data/small")
+def _parse_llm_messages(messages: list[HumanMessage | AIMessage]):
+    return [{"role": "user" if isinstance(msg, HumanMessage) else "assistant", "content": msg.content} for msg in messages]
 
-# session_id = "zzz"
-# config = {"configurable": {"session_id": session_id}}
 
-# chain = rag.conversational_rag_chain
+def _load_messages(qa: QnA, session_id: str):
+    session_history = qa.get_session_history(session_id=session_id)
+    st.session_state.messages = _parse_llm_messages(session_history.messages)
 
-# response = chain.invoke(
-#     {"input": "What is the maximum loan term I can get?"}, config=config
-# )
 
-# print(response['answer'])
+def select_chat(qa: QnA, session_id: str):
+    st.session_state.selected_conversation = session_id
+    _load_messages(qa, session_id)
 
-# response = chain.invoke(
-#     {"input": "Am I eligible for a construction loan?"}, config=config
-# )
 
-# response['context']
+def create_chat():
+    st.session_state.selected_conversation = ''
+    st.session_state.messages = []
 
-# print(response['answer'])
 
-# session_history = rag.get_session_history(session_id=session_id)
-# session_history.clear()
+def main():
+    st.title("Mortgage Assistant")
+    st.set_page_config(page_title="Mortgage Assistant")
+
+    qa = QnA(
+        embeddings=cfg.embeddings,
+        model=cfg.default_model,
+        rerank=cfg.rerank
+    )
+
+    # init session states
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    if "selected_conversation" not in st.session_state:
+        st.session_state.selected_conversation = ''
+    else:
+        select_chat(qa, st.session_state.selected_conversation)
+
+    if "conversations" not in st.session_state:
+        history_collection = qa.get_collection('message_store')
+        st.session_state.conversations = history_collection.distinct(
+            "SessionId")
+
+    if "model" not in st.session_state:
+        st.session_state.model = 'cohere'
+
+    # sidebar
+    with st.sidebar:
+        model = st.selectbox(
+            "Choose a LLM",
+            tuple(cfg.llm_label_map.keys()),
+            format_func=lambda option: cfg.llm_label_map[option],
+            index=1
+        )
+
+        st.session_state.model = model
+        st.button("New chat", on_click=create_chat)
+        st.write("Previous chat")
+
+        with st.container(height=640, border=False):
+            # list all conversations
+            conversations = st.session_state.conversations
+            conversations.sort(key=lambda x: str(x), reverse=True)
+
+            for conversation in conversations:
+                label_col, action_col = st.columns([6, 1])
+
+                with label_col:
+                    # label type for active/inactive conversation
+                    label_btn_type = "primary" if conversation == st.session_state.selected_conversation else 'secondary'
+
+                    # label tooltip
+                    now_utc = conversation.generation_time
+                    est_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+                    created_at = now_utc.astimezone(
+                        est_tz).strftime("%d/%m/%y %X")
+
+                    # label as button
+                    label_col.button(
+                        str(conversation)[:8] + "..." + str(conversation)[-8:],
+                        key=f'label_btn.{conversation}',
+                        use_container_width=True,
+                        on_click=select_chat,
+                        kwargs={"session_id": conversation},
+                        type=label_btn_type,
+                        help=created_at
+                    )
+
+                with action_col:
+                    action_col.button(
+                        "🗑️",
+                        key=f'delete_btn.{conversation}',
+                        use_container_width=True,
+                        on_click=delete_chat,
+                        kwargs={"qa": qa, "session_id": conversation}
+                    )
+
+    # Display chat messages from history on app rerun
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Accept user input
+    if prompt := st.chat_input("Ask questions"):
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+
+        # Display user message in chat message container
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Display assistant response in chat message container
+        with st.spinner("Loading..."):
+            with st.chat_message("assistant"):
+
+                qa.model = cfg.llm_map.get(st.session_state.model)
+
+                conversation = st.session_state.selected_conversation or ObjectId()
+
+                response = qa.ask_question(
+                    query=prompt,
+                    session_id=conversation
+                )
+
+                if conversation not in st.session_state.conversations:
+                    st.session_state.conversations.append(conversation)
+                    st.session_state.selected_conversation = conversation
+                    st.rerun()
+
+                content = response.get('answer')
+
+                st.markdown(content)
+
+        st.session_state.messages.append(
+            {"role": "assistant", "content": content})
+
+
+if __name__ == "__main__":
+    main()
