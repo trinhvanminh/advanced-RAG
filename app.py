@@ -2,58 +2,14 @@ import httpx
 import pytz
 import streamlit as st
 from bson.objectid import ObjectId
-from langchain_core.messages.ai import AIMessage
-from langchain_core.messages.human import HumanMessage
 
 import src.config as cfg
 from src.qna import QnA
+from src.utils.conversation import (create_conversation, delete_conversation,
+                                    select_conversation)
 
 
-def delete_chat(qa: QnA, session_id: str):
-    session_history = qa.get_session_history(session_id=session_id)
-    session_history.clear()
-
-    st.session_state.messages = []
-    st.session_state.conversations = list(
-        filter(
-            lambda x: x != session_id,
-            st.session_state.conversations
-        )
-    )
-
-    if session_id == st.session_state.selected_conversation:
-        st.session_state.selected_conversation = ''
-
-
-def _parse_llm_messages(messages: list[HumanMessage | AIMessage]):
-    return [{"role": "user" if isinstance(msg, HumanMessage) else "assistant", "content": msg.content} for msg in messages]
-
-
-def _load_messages(qa: QnA, session_id: str):
-    session_history = qa.get_session_history(session_id=session_id)
-    st.session_state.messages = _parse_llm_messages(session_history.messages)
-
-
-def select_chat(qa: QnA, session_id: str):
-    st.session_state.selected_conversation = session_id
-    _load_messages(qa, session_id)
-
-
-def create_chat():
-    st.session_state.selected_conversation = ''
-    st.session_state.messages = []
-
-
-def main():
-    st.set_page_config(page_title="Mortgage Assistant")
-    st.title("Mortgage Assistant")
-
-    qa = QnA(
-        embeddings=cfg.embeddings,
-        model=cfg.default_model,
-        rerank=cfg.rerank
-    )
-
+def init_session_state(qa: QnA):
     # init session states
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -61,7 +17,7 @@ def main():
     if "selected_conversation" not in st.session_state:
         st.session_state.selected_conversation = ''
     else:
-        select_chat(qa, st.session_state.selected_conversation)
+        select_conversation(qa, st.session_state.selected_conversation)
 
     if "conversations" not in st.session_state:
         history_collection = qa.get_collection('message_store')
@@ -71,7 +27,8 @@ def main():
     if "model" not in st.session_state:
         st.session_state.model = 'cohere'
 
-    # sidebar
+
+def render_sidebar(qa: QnA):
     with st.sidebar:
         model = st.selectbox(
             "Choose a LLM",
@@ -81,11 +38,11 @@ def main():
         )
 
         st.session_state.model = model
-        st.button("New chat", on_click=create_chat)
+        st.button("New chat", on_click=create_conversation)
         st.write("Previous chat")
 
+        # list all conversations
         with st.container(height=640, border=False):
-            # list all conversations
             conversations = st.session_state.conversations
             conversations.sort(key=lambda x: str(x), reverse=True)
 
@@ -97,7 +54,7 @@ def main():
                     label_btn_type = "primary" if conversation == st.session_state.selected_conversation else 'secondary'
 
                     if not isinstance(conversation, ObjectId):
-                        # delete_chat(qa, conversation)
+                        # delete_conversation(qa, conversation)
                         raise ValueError(
                             "Invalid `SessionId`, Expected: %s, Got: %s" % (ObjectId, type(conversation)))
 
@@ -112,7 +69,7 @@ def main():
                         str(conversation)[:8] + "..." + str(conversation)[-8:],
                         key=f'label_btn.{conversation}',
                         use_container_width=True,
-                        on_click=select_chat,
+                        on_click=select_conversation,
                         kwargs={"qa": qa, "session_id": conversation},
                         type=label_btn_type,
                         help=created_at
@@ -123,10 +80,12 @@ def main():
                         "🗑️",
                         key=f'delete_btn.{conversation}',
                         use_container_width=True,
-                        on_click=delete_chat,
+                        on_click=delete_conversation,
                         kwargs={"qa": qa, "session_id": conversation}
                     )
 
+
+def render_chat(qa):
     # Display chat messages from history on app rerun
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -171,6 +130,21 @@ def main():
 
         st.session_state.messages.append(
             {"role": "assistant", "content": content})
+
+
+def main():
+    st.set_page_config(page_title="Mortgage Assistant")
+    st.title("Mortgage Assistant")
+
+    qa = QnA(
+        embeddings=cfg.embeddings,
+        model=cfg.default_model,
+        rerank=cfg.rerank
+    )
+
+    init_session_state(qa)
+    render_sidebar(qa)
+    render_chat(qa)
 
 
 if __name__ == "__main__":
