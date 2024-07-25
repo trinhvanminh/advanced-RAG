@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from langchain_community.document_loaders import (PyMuPDFLoader, TextLoader,
                                                   UnstructuredExcelLoader,
@@ -10,15 +11,37 @@ import src.config as cfg
 
 
 class Ingestion:
-    def __init__(self, embeddings):
+    def __init__(self, embeddings, raw_data_folder_path: str = './data/raw/', preprocessed_folder_path: str = './data/preprocessed/'):
         self._text_vectorstore = None
-        self._embeddings = embeddings
+        self.embeddings = embeddings
+        self.pdf_parser = cfg.pdf_parser
+        self.raw_data_folder_path = raw_data_folder_path
+        self.preprocessed_folder_path = preprocessed_folder_path
 
-    def create_and_add_embeddings(self, folder_path: str, **text_splitter_kwargs):
+    def preprocess_data(self):
+
+        for file in os.listdir(self.raw_data_folder_path):
+            file_path = os.path.join(self.raw_data_folder_path, file)
+
+            if file.endswith('.pdf'):
+                llama_parse_documents = self.pdf_parser.load_data(file_path)
+
+                parsed_doc = "\n\n".join(
+                    [doc.text for doc in llama_parse_documents]
+                )
+
+                output_path = Path(os.path.join(
+                    self.preprocessed_folder_path, file) + '.md'
+                )
+
+                with output_path.open("w", encoding="utf-8") as f:
+                    f.write(parsed_doc)
+
+    def create_and_add_embeddings(self, **text_splitter_kwargs):
         documents = []
 
-        for file in os.listdir(folder_path):
-            file_path = os.path.join(folder_path, file)
+        for file in os.listdir(self.preprocessed_folder_path):
+            file_path = os.path.join(self.preprocessed_folder_path, file)
 
             if file.endswith('.pdf'):
                 loader = PyMuPDFLoader(file_path)
@@ -41,7 +64,7 @@ class Ingestion:
 
         self._text_vectorstore = MongoDBAtlasVectorSearch.from_documents(
             documents=chunked_documents,
-            embedding=self._embeddings,
-            collection=cfg.COLLECTION,
+            embedding=self.embeddings,
+            collection=cfg.collection,
             index_name=cfg.ATLAS_VECTOR_SEARCH_INDEX_NAME
         )

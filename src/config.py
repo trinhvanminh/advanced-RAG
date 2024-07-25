@@ -7,6 +7,7 @@ from langchain_google_genai import (ChatGoogleGenerativeAI,
 from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
+from llama_parse import LlamaParse
 from pymongo import MongoClient
 
 CONNECTION_STRING = os.getenv('MONGODB_CONNECTION_STRING')
@@ -19,8 +20,15 @@ TEMPERATURE = 0
 TOP_K = 4
 
 client = MongoClient(CONNECTION_STRING)
-COLLECTION = client[DATABASE_NAME][COLLECTION_NAME]
+collection = client[DATABASE_NAME][COLLECTION_NAME]
 HISTORY_COLLECTION_NAME = "message_store"
+
+pdf_parser = LlamaParse(
+    api_key=os.getenv('LLAMA_PARSE'),
+    result_type="markdown",
+    # parsing_instruction=instruction,
+    max_timeout=5000,
+)
 
 llm_map = {
     "chatgpt": ChatOpenAI(model="gpt-3.5-turbo", temperature=0),
