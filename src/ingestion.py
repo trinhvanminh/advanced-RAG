@@ -1,4 +1,5 @@
 import os
+from tqdm import tqdm
 from pathlib import Path
 
 from langchain_community.document_loaders import (PyMuPDFLoader, TextLoader,
@@ -19,23 +20,29 @@ class Ingestion:
         self.preprocessed_folder_path = preprocessed_folder_path
 
     def preprocess_data(self):
+        existed_files = os.listdir(self.preprocessed_folder_path)
 
-        for file in os.listdir(self.raw_data_folder_path):
-            file_path = os.path.join(self.raw_data_folder_path, file)
+        for root, _, files in os.walk(self.raw_data_folder_path):
+            for file in tqdm(files):
+                file_path = os.path.join(root, file)
 
-            if file.endswith('.pdf'):
-                llama_parse_documents = self.pdf_parser.load_data(file_path)
+                if any(existed_file.startswith(file) for existed_file in existed_files):
+                    continue
 
-                parsed_doc = "\n\n".join(
-                    [doc.text for doc in llama_parse_documents]
-                )
+                if file.endswith('.pdf'):
+                    llama_parse_documents = self.pdf_parser.load_data(
+                        file_path)
 
-                output_path = Path(os.path.join(
-                    self.preprocessed_folder_path, file) + '.md'
-                )
+                    parsed_doc = "\n\n".join(
+                        [doc.text for doc in llama_parse_documents]
+                    )
 
-                with output_path.open("w", encoding="utf-8") as f:
-                    f.write(parsed_doc)
+                    output_path = Path(os.path.join(
+                        self.preprocessed_folder_path, file) + '.md'
+                    )
+
+                    with output_path.open("w", encoding="utf-8") as f:
+                        f.write(parsed_doc)
 
     def create_and_add_embeddings(self, **text_splitter_kwargs):
         documents = []
