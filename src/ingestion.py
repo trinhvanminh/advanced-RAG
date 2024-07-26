@@ -1,30 +1,39 @@
 import os
-from tqdm import tqdm
 from pathlib import Path
 
 from langchain_community.document_loaders import (PyMuPDFLoader, TextLoader,
                                                   UnstructuredExcelLoader,
                                                   UnstructuredMarkdownLoader)
+from langchain_core.embeddings import Embeddings
+from langchain_core.vectorstores import VectorStore
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from tqdm import tqdm
 
 import src.config as cfg
 
 
 class Ingestion:
-    def __init__(self, embeddings, vector_store=None, raw_data_folder_path: str = './data/raw/', preprocessed_folder_path: str = './data/preprocessed/'):
-        if vector_store is None:
-            self.vector_store = MongoDBAtlasVectorSearch(
-                collection=cfg.collection,
-                index_name=cfg.ATLAS_VECTOR_SEARCH_INDEX_NAME
-            )
-        else:
-            self.vector_store = vector_store
-
+    def __init__(
+        self,
+        embeddings: Embeddings = cfg.embeddings,
+        vector_store: VectorStore | None = None,
+        raw_data_folder_path: str = './data/raw/',
+        preprocessed_folder_path: str = './data/preprocessed/'
+    ):
         self.embeddings = embeddings
         self.pdf_parser = cfg.pdf_parser
         self.raw_data_folder_path = raw_data_folder_path
         self.preprocessed_folder_path = preprocessed_folder_path
+
+        if vector_store is None:
+            self.vector_store = MongoDBAtlasVectorSearch(
+                collection=cfg.collection,
+                embedding=self.embeddings,
+                index_name=cfg.ATLAS_VECTOR_SEARCH_INDEX_NAME,
+            )
+        else:
+            self.vector_store = vector_store
 
     def preprocess_data(self):
         existed_files = os.listdir(self.preprocessed_folder_path)
@@ -76,7 +85,6 @@ class Ingestion:
 
         chunked_documents = text_splitter.split_documents(documents)
 
-        self.vector_store.from_documents(
-            documents=chunked_documents,
-            embedding=self.embeddings,
-        )
+        self.vector_store.add_documents(documents=chunked_documents)
+
+        return self.vector_store

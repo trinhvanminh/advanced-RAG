@@ -2,6 +2,7 @@ import httpx
 import pytz
 import streamlit as st
 from bson.objectid import ObjectId
+from langchain_community.vectorstores.azuresearch import AzureSearch
 
 import src.config as cfg
 from src.qna import QnA
@@ -85,7 +86,7 @@ def render_sidebar(qa: QnA):
                     )
 
 
-def render_chat(qa):
+def render_chat(qa: QnA):
     # Display chat messages from history on app rerun
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -137,9 +138,15 @@ def main():
     st.title("Mortgage Assistant")
 
     qa = QnA(
-        embeddings=cfg.embeddings,
+        rerank=cfg.rerank,
         model=cfg.default_model,
-        rerank=cfg.rerank
+        # embeddings=cfg.azure_embeddings,
+        # vector_store=AzureSearch(
+        #     azure_search_endpoint=cfg.AZURE_SEARCH_ENDPOINT,
+        #     azure_search_key=cfg.AZURE_SEARCH_KEY,
+        #     index_name=cfg.AZURE_SEARCH_INDEX_NAME,
+        #     embedding_function=cfg.azure_embeddings.embed_query,
+        # ),
     )
 
     init_session_state(qa)

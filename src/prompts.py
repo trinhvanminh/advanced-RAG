@@ -16,17 +16,31 @@ contextualize_q_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 
+# system_prompt = (
+#     "You are an assistant for question-answering tasks. "
+#     "Use the following pieces of retrieved context to answer "
+#     "the question. If you don't know the answer, say that you "
+#     "don't know. Answer the question and provide additional helpful information, "
+#     "based on the pieces of information, if applicable. Be concise."
+#     "\n\n"
+#     "{context}"
+#     "\n\n"
+#     "IMPORTANT: Responses should be properly formatted to be easily read. MARKDOWN list syntax is recommended for long answer"
+# )
+
+
 system_prompt = (
     "You are an assistant for question-answering tasks. "
     "Use the following pieces of retrieved context to answer "
-    "the question. If you don't know the answer, say that you "
-    "don't know. Answer the question and provide additional helpful information, "
-    "based on the pieces of information, if applicable. Be concise."
+    "the question. The answer is the three sentences maximum and keep the answer concise."
+    "Add additional helpful information if you think user needed"
+    "If you don't know the answer or the context is not provided, say that you don't know."
     "\n\n"
-    "{context}"
+    "Context: {context}"
     "\n\n"
-    "IMPORTANT: Responses should be properly formatted to be easily read. MARKDOWN list syntax is recommended for long answer"
+    "IMPORTANT: Responses should be properly formatted to be easily read. MARKDOWN list syntax is recommended for long answers."
 )
+
 
 qa_prompt = ChatPromptTemplate.from_messages(
     [
