@@ -7,7 +7,7 @@ from langchain_google_genai import (ChatGoogleGenerativeAI,
                                     GoogleGenerativeAIEmbeddings)
 from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
-from langchain_openai import AzureOpenAIEmbeddings, ChatOpenAI
+from langchain_openai import AzureOpenAIEmbeddings, ChatOpenAI, AzureChatOpenAI
 from llama_parse import LlamaParse
 from pymongo import MongoClient
 
@@ -42,16 +42,18 @@ TOP_K = 4
 
 # llm options
 llm_map = {
+    "azure-openai": AzureChatOpenAI(azure_deployment="mortgage-gpt-4", api_version="2024-05-01-preview", temperature=TEMPERATURE),
     "chatgpt": ChatOpenAI(model="gpt-3.5-turbo", temperature=0),
-    "gemini": ChatGoogleGenerativeAI(model='gemini-1.5-pro', temperature=0),
-    "cohere": ChatCohere(model="command-r-plus", temperature=0),
-    "ollamma": ChatOllama(model="llama3", temperature=0),
-    "groq": ChatGroq(model_name="llama3-70b-8192", temperature=0),
-    "fireworks": ChatFireworks(model="accounts/fireworks/models/llama-v3-70b-instruct", temperature=0)
+    "gemini": ChatGoogleGenerativeAI(model='gemini-1.5-pro', temperature=TEMPERATURE),
+    "cohere": ChatCohere(model="command-r-plus", temperature=TEMPERATURE),
+    "ollamma": ChatOllama(model="llama3", temperature=TEMPERATURE),
+    "groq": ChatGroq(model_name="llama3-70b-8192", temperature=TEMPERATURE),
+    "fireworks": ChatFireworks(model="accounts/fireworks/models/llama-v3-70b-instruct", temperature=TEMPERATURE)
 }
 
 llm_label_map = {
-    # "chatgpt": "OpenAI (gpt-3.5-turbo)",
+    "azure-openai": "Azure OpenAI (mortgage-gpt-4o)",
+    # "chatgpt": "OpenAI (gpt-4o)",
     "gemini": 'Gemini (gemini-1.5-pro)',
     "cohere": 'Cohere (command-r-plus)',
     "ollamma": "Ollama (llama3)",
@@ -71,7 +73,7 @@ default_model = llm_map["cohere"],
 
 # ========================AZURE stuffs================================
 
-AZURE_ENDPOINT: str = os.getenv('AZURE_ENDPOINT')
+AZURE_OPENAI_ENDPOINT: str = os.getenv('AZURE_OPENAI_ENDPOINT')
 AZURE_OPENAI_API_KEY: str = os.getenv('AZURE_OPENAI_API_KEY')
 AZURE_OPENAI_API_VERSION: str = os.getenv('AZURE_OPENAI_API_VERSION')
 AZURE_EMBEDDING_DEPLOYMENT_NAME: str = os.getenv(
@@ -83,7 +85,7 @@ AZURE_SEARCH_KEY: str = os.getenv('AZURE_SEARCH_KEY')
 azure_embeddings: AzureOpenAIEmbeddings = AzureOpenAIEmbeddings(
     azure_deployment=AZURE_EMBEDDING_DEPLOYMENT_NAME,
     openai_api_version=AZURE_OPENAI_API_VERSION,
-    azure_endpoint=AZURE_ENDPOINT,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_key=AZURE_OPENAI_API_KEY,
 )
 
