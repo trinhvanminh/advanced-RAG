@@ -12,8 +12,15 @@ import src.config as cfg
 
 
 class Ingestion:
-    def __init__(self, embeddings, raw_data_folder_path: str = './data/raw/', preprocessed_folder_path: str = './data/preprocessed/'):
-        self._text_vectorstore = None
+    def __init__(self, embeddings, vector_store=None, raw_data_folder_path: str = './data/raw/', preprocessed_folder_path: str = './data/preprocessed/'):
+        if vector_store is None:
+            self.vector_store = MongoDBAtlasVectorSearch(
+                collection=cfg.collection,
+                index_name=cfg.ATLAS_VECTOR_SEARCH_INDEX_NAME
+            )
+        else:
+            self.vector_store = vector_store
+
         self.embeddings = embeddings
         self.pdf_parser = cfg.pdf_parser
         self.raw_data_folder_path = raw_data_folder_path
@@ -69,9 +76,7 @@ class Ingestion:
 
         chunked_documents = text_splitter.split_documents(documents)
 
-        self._text_vectorstore = MongoDBAtlasVectorSearch.from_documents(
+        self.vector_store.from_documents(
             documents=chunked_documents,
             embedding=self.embeddings,
-            collection=cfg.collection,
-            index_name=cfg.ATLAS_VECTOR_SEARCH_INDEX_NAME
         )
