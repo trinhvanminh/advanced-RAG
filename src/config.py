@@ -13,19 +13,6 @@ from pymongo import MongoClient
 
 load_dotenv()
 
-CONNECTION_STRING = os.getenv('MONGODB_CONNECTION_STRING')
-DATABASE_NAME = os.getenv('DB_NAME')
-COLLECTION_NAME = os.getenv('COLLECTION_NAME') + '.full.2048.128__v4'
-ATLAS_VECTOR_SEARCH_INDEX_NAME = os.getenv('ATLAS_VECTOR_SEARCH_INDEX_NAME')
-
-PDF_CHAR_SPLITTER_CHUNK_SIZE = 2048
-PDF_CHAR_SPLITTER_CHUNK_OVERLAP = 128
-TEMPERATURE = 0
-TOP_K = 4
-
-client = MongoClient(CONNECTION_STRING)
-collection = client[DATABASE_NAME][COLLECTION_NAME]
-HISTORY_COLLECTION_NAME = "message_store"
 
 pdf_parser = LlamaParse(
     api_key=os.getenv('LLAMA_PARSE'),
@@ -34,6 +21,26 @@ pdf_parser = LlamaParse(
     max_timeout=5000,
 )
 
+PDF_CHAR_SPLITTER_CHUNK_SIZE = 2048
+PDF_CHAR_SPLITTER_CHUNK_OVERLAP = 128
+
+# mongodb vector store
+CONNECTION_STRING = os.getenv('MONGODB_CONNECTION_STRING')
+DATABASE_NAME = os.getenv('DB_NAME')
+COLLECTION_NAME = (os.getenv('COLLECTION_NAME') +
+                   f'.full.{PDF_CHAR_SPLITTER_CHUNK_SIZE}.{PDF_CHAR_SPLITTER_CHUNK_OVERLAP}__v5')
+ATLAS_VECTOR_SEARCH_INDEX_NAME = os.getenv('ATLAS_VECTOR_SEARCH_INDEX_NAME')
+
+client = MongoClient(CONNECTION_STRING)
+collection = client[DATABASE_NAME][COLLECTION_NAME]
+HISTORY_COLLECTION_NAME = "message_store"
+
+
+# model config
+TEMPERATURE = 0
+TOP_K = 4
+
+# llm options
 llm_map = {
     "chatgpt": ChatOpenAI(model="gpt-3.5-turbo", temperature=0),
     "gemini": ChatGoogleGenerativeAI(model='gemini-1.5-pro', temperature=0),
@@ -80,5 +87,5 @@ azure_embeddings: AzureOpenAIEmbeddings = AzureOpenAIEmbeddings(
     api_key=AZURE_OPENAI_API_KEY,
 )
 
-# no need to precreate in Azure
+# no need to pre-create in Azure
 AZURE_SEARCH_INDEX_NAME: str = os.getenv('AZURE_SEARCH_INDEX_NAME')

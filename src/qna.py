@@ -6,7 +6,9 @@ from langchain.chains.history_aware_retriever import \
     create_history_aware_retriever
 from langchain.chains.retrieval import create_retrieval_chain
 from langchain.retrievers import ContextualCompressionRetriever
+from langchain_core.embeddings import Embeddings
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.vectorstores import VectorStore
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
 from pymongo import MongoClient
@@ -16,25 +18,37 @@ import src.prompts as prompts
 
 
 class QnA:
-    def __init__(self, embeddings, model, rerank):
-        self.embeddings = embeddings
+    def __init__(
+        self,
+        model,
+        rerank,
+        embeddings: Embeddings = cfg.embeddings,
+        vector_store: VectorStore | None = None
+    ):
+
         self.model = model
         self.rerank = rerank
+        self.embeddings = embeddings
 
         # init vector store
-        self.vector_store = MongoDBAtlasVectorSearch(
-            collection=self.get_collection(),
-            embedding=self.embeddings,
-            index_name=cfg.ATLAS_VECTOR_SEARCH_INDEX_NAME
-        )
+        if vector_store is None:
+            self.vector_store = MongoDBAtlasVectorSearch(
+                collection=self.get_collection(),
+                embedding=self.embeddings,
+                index_name=cfg.ATLAS_VECTOR_SEARCH_INDEX_NAME
+            )
+            self.vector_store.as_retriever()
+        else:
+            self.vector_store = vector_store
 
         self.retriever = ContextualCompressionRetriever(
             base_compressor=self.rerank,
             base_retriever=self.vector_store.as_retriever(
                 search_type="similarity",
+                # k=cfg.TOP_K,  # for Azure
                 search_kwargs={
-                    # "fetch_k": 20,
-                    "k": cfg.TOP_K,
+                    "fetch_k": 20,
+                    # "k": cfg.TOP_K,
                 },
             ),
         )
