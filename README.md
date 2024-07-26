@@ -2,6 +2,10 @@
 
 ### RAG (retrieval-augmented generation):
 
+![](https://huyenchip.com/assets/pics/genai-platform/1-genai-platform.png)
+source: https://huyenchip.com/2024/07/25/genai-platform.html
+
+Definitions:
 https://aws.amazon.com/vi/what-is/retrieval-augmented-generation/
 https://cloud.google.com/architecture/rag-capable-gen-ai-app-using-vertex-ai
 
