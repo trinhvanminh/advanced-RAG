@@ -32,8 +32,7 @@ contextualize_q_prompt = ChatPromptTemplate.from_messages(
 system_prompt = (
     "You are an assistant for question-answering tasks. "
     "Use the following pieces of retrieved context to answer "
-    "the question. The answer is the three sentences maximum and keep the answer concise."
-    "Add additional helpful information if you think user needed"
+    "the question. You can add additional helpful information (only in the context) if you think user needed. "
     "If you don't know the answer or the context is not provided, say that you don't know."
     "\n\n"
     "Context: {context}"
