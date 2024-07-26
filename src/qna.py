@@ -22,15 +22,15 @@ class QnA:
         self.rerank = rerank
 
         # init vector store
-        self._text_vectorstore = MongoDBAtlasVectorSearch(
+        self.vector_store = MongoDBAtlasVectorSearch(
             collection=self.get_collection(),
             embedding=self.embeddings,
             index_name=cfg.ATLAS_VECTOR_SEARCH_INDEX_NAME
         )
 
-        self._text_retriever = ContextualCompressionRetriever(
+        self.retriever = ContextualCompressionRetriever(
             base_compressor=self.rerank,
-            base_retriever=self._text_vectorstore.as_retriever(
+            base_retriever=self.vector_store.as_retriever(
                 search_type="similarity",
                 search_kwargs={
                     # "fetch_k": 20,
@@ -57,7 +57,7 @@ class QnA:
         start_time = time.time()
         history_aware_retriever = create_history_aware_retriever(
             self.model,
-            self._text_retriever,
+            self.retriever,
             prompts.contextualize_q_prompt)
 
         question_answer_chain = create_stuff_documents_chain(
