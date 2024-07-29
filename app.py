@@ -1,64 +1,158 @@
-from langchain_cohere import ChatCohere
-import os
+import httpx
+import pytz
+import streamlit as st
+from bson.objectid import ObjectId
+from langchain_community.vectorstores.azuresearch import AzureSearch
 
-from dotenv import load_dotenv
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-
-from rag import RAG
-
-load_dotenv()
-
-MONGODB_CONNECTION_STRING = os.getenv('MONGODB_CONNECTION_STRING')
-DB_NAME = os.getenv('DB_NAME')
-COLLECTION_NAME = os.getenv('COLLECTION_NAME') + '.full.2048.128__v4'
-ATLAS_VECTOR_SEARCH_INDEX_NAME = os.getenv('ATLAS_VECTOR_SEARCH_INDEX_NAME')
-
-# default llm
-llm = ChatCohere(model="command-r", temperature=0)
-
-embedding = GoogleGenerativeAIEmbeddings(model='models/text-embedding-004')
-
-rag = RAG(
-    db_name=DB_NAME,
-    collection_name=COLLECTION_NAME,
-    mongodb_uri=MONGODB_CONNECTION_STRING,
-    index_name=ATLAS_VECTOR_SEARCH_INDEX_NAME,
-    llm=llm,
-    embedding=embedding
-)
+import src.config as cfg
+from src.qna import QnA
+from src.utils.conversation import (create_conversation, delete_conversation,
+                                    select_conversation)
 
 
-# history_collection = rag.collection('history')
-# results = history_collection.distinct("SessionId")
+def init_session_state(qa: QnA):
+    # init session states
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-# print(results)
+    if "selected_conversation" not in st.session_state:
+        st.session_state.selected_conversation = ''
+    else:
+        select_conversation(qa, st.session_state.selected_conversation)
 
-# print(rag.retriever.invoke("What is the maximum loan term I can get?"))
+    if "conversations" not in st.session_state:
+        history_collection = qa.get_collection('message_store')
+        st.session_state.conversations = history_collection.distinct(
+            "SessionId")
 
-# rag.collection.drop()
-# count = rag.collection().count_documents({})
+    if "model" not in st.session_state:
+        st.session_state.model = 'cohere'
 
-# if count == 0:
-#     rag.load_documents(folder_path="./data/small")
 
-# session_id = "zzz"
-# config = {"configurable": {"session_id": session_id}}
+def render_sidebar(qa: QnA):
+    with st.sidebar:
+        model = st.selectbox(
+            "Choose a LLM",
+            tuple(cfg.llm_label_map.keys()),
+            format_func=lambda option: cfg.llm_label_map[option],
+            index=1
+        )
 
-# chain = rag.conversational_rag_chain
+        st.session_state.model = model
+        st.button("New chat", on_click=create_conversation)
+        st.write("Previous chat")
 
-# response = chain.invoke(
-#     {"input": "What is the maximum loan term I can get?"}, config=config
-# )
+        # list all conversations
+        with st.container(height=640, border=False):
+            conversations = st.session_state.conversations
+            conversations.sort(key=lambda x: str(x), reverse=True)
 
-# print(response['answer'])
+            for conversation in conversations:
+                label_col, action_col = st.columns([6, 1])
 
-# response = chain.invoke(
-#     {"input": "Am I eligible for a construction loan?"}, config=config
-# )
+                with label_col:
+                    # label type for active/inactive conversation
+                    label_btn_type = "primary" if conversation == st.session_state.selected_conversation else 'secondary'
 
-# response['context']
+                    if not isinstance(conversation, ObjectId):
+                        # delete_conversation(qa, conversation)
+                        raise ValueError(
+                            "Invalid `SessionId`, Expected: %s, Got: %s" % (ObjectId, type(conversation)))
 
-# print(response['answer'])
+                    # label tooltip
+                    now_utc = conversation.generation_time
+                    est_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+                    created_at = now_utc.astimezone(
+                        est_tz).strftime("%d/%m/%y %X")
 
-# session_history = rag.get_session_history(session_id=session_id)
-# session_history.clear()
+                    # label as button
+                    label_col.button(
+                        str(conversation)[:8] + "..." + str(conversation)[-8:],
+                        key=f'label_btn.{conversation}',
+                        use_container_width=True,
+                        on_click=select_conversation,
+                        kwargs={"qa": qa, "session_id": conversation},
+                        type=label_btn_type,
+                        help=created_at
+                    )
+
+                with action_col:
+                    action_col.button(
+                        "🗑️",
+                        key=f'delete_btn.{conversation}',
+                        use_container_width=True,
+                        on_click=delete_conversation,
+                        kwargs={"qa": qa, "session_id": conversation}
+                    )
+
+
+def render_chat(qa: QnA):
+    # Display chat messages from history on app rerun
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Accept user input
+    if prompt := st.chat_input("Ask questions"):
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+
+        # Display user message in chat message container
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Display assistant response in chat message container
+        with st.spinner("Loading..."):
+            with st.chat_message("assistant"):
+
+                qa.model = cfg.llm_map.get(st.session_state.model)
+
+                conversation = st.session_state.selected_conversation or ObjectId()
+
+                try:
+                    response = qa.ask_question(
+                        query=prompt,
+                        session_id=conversation
+                    )
+
+                    if conversation not in st.session_state.conversations:
+                        st.session_state.conversations.append(conversation)
+                        st.session_state.selected_conversation = conversation
+                        st.rerun()
+
+                    content = response.get('answer')
+
+                    st.markdown(content)
+
+                except httpx.ConnectError:
+                    st.warning(
+                        f"Check your {st.session_state.model} connection")
+                    return
+
+        st.session_state.messages.append(
+            {"role": "assistant", "content": content})
+
+
+def main():
+    st.set_page_config(page_title="Mortgage Assistant")
+    st.title("Mortgage Assistant")
+
+    qa = QnA(
+        rerank=cfg.rerank,
+        model=cfg.default_model,
+        embeddings=cfg.azure_embeddings,
+        vector_store=AzureSearch(
+            azure_search_endpoint=cfg.AZURE_SEARCH_ENDPOINT,
+            azure_search_key=cfg.AZURE_SEARCH_KEY,
+            index_name=cfg.AZURE_SEARCH_INDEX_NAME,
+            embedding_function=cfg.azure_embeddings.embed_query,
+        ),
+    )
+
+    init_session_state(qa)
+    render_sidebar(qa)
+    render_chat(qa)
+
+
+if __name__ == "__main__":
+    main()
