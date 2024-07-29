@@ -6,10 +6,10 @@ from langchain.chains.history_aware_retriever import \
     create_history_aware_retriever
 from langchain.chains.retrieval import create_retrieval_chain
 from langchain.retrievers import ContextualCompressionRetriever
-from langchain_core.embeddings import Embeddings
+from langchain_community.vectorstores.azure_cosmos_db import \
+    AzureCosmosDBVectorSearch
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.vectorstores import VectorStore
-from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
 from pymongo import MongoClient
 
@@ -22,22 +22,15 @@ class QnA:
         self,
         model,
         rerank,
-        embeddings: Embeddings = cfg.embeddings,
         vector_store: VectorStore | None = None
     ):
 
         self.model = model
         self.rerank = rerank
-        self.embeddings = embeddings
 
         # init vector store
         if vector_store is None:
-            self.vector_store = MongoDBAtlasVectorSearch(
-                collection=self.get_collection(),
-                embedding=self.embeddings,
-                index_name=cfg.ATLAS_VECTOR_SEARCH_INDEX_NAME
-            )
-            self.vector_store.as_retriever()
+            self.vector_store: AzureCosmosDBVectorSearch = cfg.vector_stores['azure-cosmos']
         else:
             self.vector_store = vector_store
 
