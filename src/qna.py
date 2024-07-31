@@ -49,6 +49,7 @@ class QnA:
                 search_kwargs={
                     "fetch_k": 20,
                     # "k": cfg.TOP_K,
+                    # "score_threshold": 0.5,
                 },
             ),
         )
@@ -69,10 +70,12 @@ class QnA:
 
     def ask_question(self, query: str, session_id: str):
         start_time = time.time()
+
         history_aware_retriever = create_history_aware_retriever(
             self.model,
             self.retriever,
-            prompts.contextualize_q_prompt)
+            prompts.contextualize_q_prompt
+        )
 
         question_answer_chain = create_stuff_documents_chain(
             self.model,
