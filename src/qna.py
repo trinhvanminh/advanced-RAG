@@ -70,6 +70,18 @@ class QnA:
             prompts.contextualize_q_prompt
         )
 
+        # (
+        #     RunnablePassthrough.assign({"context": }}).with_config(
+        #         run_name="format_general_inputs"
+        #     )
+        #     | prompts.qa_prompt
+        #     | self.model
+        #     | StrOutputParser()
+        # ).with_config(run_name="stuff_documents_chain")
+        # router_chain =
+
+        # TODO: if context is not provided ==> using context_chain from CSV
+
         question_answer_chain = create_stuff_documents_chain(
             self.model,
             prompts.qa_prompt
