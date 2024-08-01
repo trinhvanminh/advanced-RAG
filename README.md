@@ -9,6 +9,16 @@ Definitions:
 https://aws.amazon.com/vi/what-is/retrieval-augmented-generation/
 https://cloud.google.com/architecture/rag-capable-gen-ai-app-using-vertex-ai
 
+#### Vector search & Embedding
+
+![image](https://github.com/user-attachments/assets/966480eb-592b-47e3-a281-6688485d8b7d)
+
+![image](https://github.com/user-attachments/assets/fdb0bfab-e905-45d8-80c1-6a2d214a44a3)
+
+![image](https://github.com/user-attachments/assets/6d0c129d-8416-449b-a8cb-0e61c586c94e)
+
+
+
 ### RILF (Reinforcement Learning from Human Feedback)
 
 https://aws.amazon.com/vi/what-is/reinforcement-learning-from-human-feedback/
