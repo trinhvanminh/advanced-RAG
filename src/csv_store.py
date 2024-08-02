@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List
+from typing import Dict, List, TypedDict
 
 import pandas as pd
 from langchain_core.documents import Document
@@ -18,7 +18,7 @@ FILE_SELECTION_PROMPT = (
     "DO NOT generate new file names, ONLY select on provided file names. "
     "Wrap the output between ```json and ```"
     "{format_instructions} "
-    "List of CSV file names:"
+    "\nList of CSV file names:"
     "\n"
     "{file_names}"
 )
@@ -55,6 +55,11 @@ class FileNames(BaseModel):
     file_names: List[str]
 
 
+class InputAndRelevantHeadersPrompt(TypedDict):
+    input: str
+    relevant_headers_prompt: str
+
+
 class CSVStore:
     def __init__(self, llm: BaseChatModel, directory_path: str):
         self.llm = llm
@@ -76,8 +81,10 @@ class CSVStore:
         file_name_with_sample_rows_context = []
         for file_name in file_names.file_names:
             df = pd.read_csv(f'{self.directory_path}/{file_name}')
-            sample_rows = df.head().to_markdown()
-            file_context = f"""File name: {file_name}\nSample rows:\n{sample_rows}"""
+            sample_rows = df.head().to_markdown(index=False)
+
+            file_context = f"""## File name: `{file_name}`\n### Sample rows:\n{sample_rows}"""
+
             file_name_with_sample_rows_context.append(file_context)
 
         combined_prompt = "\n\n===\n\n".join(
@@ -85,7 +92,7 @@ class CSVStore:
 
         return combined_prompt
 
-    def get_header_selection_chain(self):
+    def get_header_selection_chain(self, data: InputAndRelevantHeadersPrompt) -> RunnableSerializable[Dict, RelevantHeaders]:
         parser = PydanticOutputParser(pydantic_object=RelevantHeaders)
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -107,8 +114,7 @@ class CSVStore:
 
                 data = (df[relevant_header.headers]
                         .drop_duplicates()
-                        .reset_index(drop=True)
-                        .to_markdown())
+                        .to_markdown(index=False))
 
                 document = Document(
                     page_content=data,
@@ -126,16 +132,17 @@ class CSVStore:
             file_names=file_names
         )
 
-        header_selection_chain = self.get_header_selection_chain()
+        data: InputAndRelevantHeadersPrompt = {
+            "input": RunnablePassthrough(),
+            "relevant_headers_prompt": (
+                file_selection_chain
+                | RunnableLambda(self.get_relevant_headers_prompt)
+            )
+        }
 
         combined_header_selection_chain = (
-            RunnablePassthrough.assign(
-                relevant_headers_prompt=(
-                    file_selection_chain
-                    | RunnableLambda(self.get_relevant_headers_prompt)
-                )
-            )
-            | header_selection_chain
+            data
+            | RunnableLambda(self.get_header_selection_chain)
         )
 
         document_retriever_chain = (
