@@ -1,3 +1,4 @@
+from langchain_core.runnables import RunnablePassthrough
 import os
 from typing import Dict, List
 
@@ -45,7 +46,7 @@ class CSVStore:
                             "DO NOT generate new file names, ONLY select on provided file names. "
                             "Wrap the output between ```json and ```"
                             "{format_instructions} "
-                            "List of CSV file names:"
+                            "\nList of CSV file names:"
                             "\n"
                             "{file_names}")
                  ),
@@ -61,9 +62,9 @@ class CSVStore:
         for file_name in file_names.file_names:
             df = pd.read_csv(f'{self.directory_path}/{file_name}')
 
-            sample_rows = df.head().to_markdown()
+            sample_rows = df.head().to_markdown(index=False)
 
-            file_context = f"""File name: {file_name}\nSample rows:\n{sample_rows}"""
+            file_context = f"""## File name: `{file_name}`\n### Sample rows:\n{sample_rows}"""
 
             file_name_with_sample_rows_context.append(file_context)
 
@@ -73,16 +74,21 @@ class CSVStore:
 
         return combined_prompt
 
-    def get_header_selection_chain(self):
+    def get_header_selection_chain(self, _) -> RunnableSerializable[Dict, RelevantHeaders]:
+        # second parameter is input and relevant_headers_prompt from the previous output
+
         parser = PydanticOutputParser(pydantic_object=RelevantHeaders)
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", ("You have a list of CSV file names and sample rows from each file. "
+                ("system", ("You have a list of CSV file names (usually 2 file names) and sample rows from each file. "
+                            "Each file name start with: ## File name: <file_name>. "
                             "Based on the user input, identify the most helpful headers from the sample rows to answer the query. "
                             "Provide a list of these headers or an empty list if no helpful headers are found."
                             "Wrap the output between ```json and ```"
                             "{format_instructions}"
                             "\n"
+                            "\n"
+                            "Here is the list of CSV file names and sample rows:\n"
                             "{relevant_headers_prompt}"
                             )
                  ),
@@ -103,8 +109,8 @@ class CSVStore:
 
                 data = (df[relevant_header.headers]
                         .drop_duplicates()
-                        .reset_index(drop=True)
-                        .to_markdown())
+                        # .reset_index(drop=True)
+                        .to_markdown(index=False))
 
                 document = Document(
                     page_content=data,
@@ -122,22 +128,26 @@ class CSVStore:
             file_names=file_names
         )
 
-        header_selection_chain = self.get_header_selection_chain()
+        header_prompt = (
+            file_selection_chain
+            | RunnableLambda(self.get_relevant_headers_prompt)
+        )
 
         combined_header_selection_chain = (
-            RunnablePassthrough.assign(
-                relevant_headers_prompt=(
-                    file_selection_chain
-                    | RunnableLambda(self.get_relevant_headers_prompt)
-                )
-            )
-            | header_selection_chain
+            {
+                "input": RunnablePassthrough(),
+                "relevant_headers_prompt": header_prompt
+            }
+            | RunnableLambda(self.get_header_selection_chain)
         )
 
         document_retriever_chain = (
             combined_header_selection_chain
             | RunnableLambda(self.document_retriever)
         )
+
+        print(document_retriever_chain.invoke(
+            "give me the best lender with lowest bridging loans fees and lowest cashback amount"))
 
         return document_retriever_chain
 
@@ -171,7 +181,7 @@ class CSVStore:
 if __name__ == "__main__":
     directory_path = './data/preprocessed/csv'
     llm = llm_options['azure-openai'].get('llm')
-    question = "give me the best lender with lowest briding loans fees and lowest cashback amount"
+    question = "give me the best lender with lowest bridging loans fees and lowest cashback amount"
 
     csv_store = CSVStore(
         llm=llm,
@@ -180,5 +190,5 @@ if __name__ == "__main__":
 
     retriever = csv_store.get_retriever()
 
-    response = retriever.invoke({"input": question})
-    print(response)
+    # response = retriever.invoke({"input": question})
+    # print(response)
