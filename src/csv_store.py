@@ -10,9 +10,33 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.retrievers import RetrieverOutput
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.runnables.base import RunnableSerializable
-from rich import print
 
-from src.config import llm_options
+
+FILE_SELECTION_PROMPT = (
+    "You have a list of CSV file names with information on various financial products and services. "
+    "Select up to 2 file names in the list that would be most helpful to answer user input. "
+    "DO NOT generate new file names, ONLY select on provided file names. "
+    "Wrap the output between ```json and ```"
+    "{format_instructions} "
+    "List of CSV file names:"
+    "\n"
+    "{file_names}"
+)
+
+HEADER_SELECTION_PROMPT = (
+    "You have a list of CSV file names and sample rows from each file. "
+    "Based on the user input, identify the most helpful headers from the sample rows to answer the query. "
+    "Provide a list of these headers or an empty list if no helpful headers are found."
+    "Wrap the output between ```json and ```"
+    "{format_instructions}"
+    "\n"
+    "{relevant_headers_prompt}"
+)
+
+FINAL_QUERY_PROMPT = (
+    "Based on the context answer the user input",
+    "{context}"
+)
 
 
 class RelevantHeader(BaseModel):
@@ -40,15 +64,7 @@ class CSVStore:
         parser = PydanticOutputParser(pydantic_object=FileNames)
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", ("You have a list of CSV file names with information on various financial products and services. "
-                            "Select up to 2 file names in the list that would be most helpful to answer user input. "
-                            "DO NOT generate new file names, ONLY select on provided file names. "
-                            "Wrap the output between ```json and ```"
-                            "{format_instructions} "
-                            "List of CSV file names:"
-                            "\n"
-                            "{file_names}")
-                 ),
+                ("system", FILE_SELECTION_PROMPT),
                 ("human", "{input}")
             ]
         ).partial(format_instructions=parser.get_format_instructions(), file_names=file_names)
@@ -60,16 +76,12 @@ class CSVStore:
         file_name_with_sample_rows_context = []
         for file_name in file_names.file_names:
             df = pd.read_csv(f'{self.directory_path}/{file_name}')
-
             sample_rows = df.head().to_markdown()
-
             file_context = f"""File name: {file_name}\nSample rows:\n{sample_rows}"""
-
             file_name_with_sample_rows_context.append(file_context)
 
         combined_prompt = "\n\n===\n\n".join(
-            file_name_with_sample_rows_context
-        )
+            file_name_with_sample_rows_context)
 
         return combined_prompt
 
@@ -77,15 +89,7 @@ class CSVStore:
         parser = PydanticOutputParser(pydantic_object=RelevantHeaders)
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", ("You have a list of CSV file names and sample rows from each file. "
-                            "Based on the user input, identify the most helpful headers from the sample rows to answer the query. "
-                            "Provide a list of these headers or an empty list if no helpful headers are found."
-                            "Wrap the output between ```json and ```"
-                            "{format_instructions}"
-                            "\n"
-                            "{relevant_headers_prompt}"
-                            )
-                 ),
+                ("system", HEADER_SELECTION_PROMPT),
                 ("human", "{input}")
             ]
         ).partial(format_instructions=parser.get_format_instructions())
@@ -140,45 +144,3 @@ class CSVStore:
         )
 
         return document_retriever_chain
-
-    # def main(self):
-
-    #     document_retriever = self.get_retriever()
-
-    #     final_query_prompt = ChatPromptTemplate.from_messages(
-    #         [
-    #             ('system', """Based on the context answer the user input",
-
-    #             {context}
-
-    #             """),
-    #             ("human", "{input}")
-    #         ]
-    #     )
-
-    #     chain = (
-    #         RunnablePassthrough.assign(
-    #             context=document_retriever.with_config(
-    #                 run_name="retrieve_documents")
-    #         )
-    #         | final_query_prompt
-    #         | self.llm
-    #     )
-
-    #     print(chain.invoke({"input": question}).content)
-
-
-if __name__ == "__main__":
-    directory_path = './data/preprocessed/csv'
-    llm = llm_options['azure-openai'].get('llm')
-    question = "give me the best lender with lowest briding loans fees and lowest cashback amount"
-
-    csv_store = CSVStore(
-        llm=llm,
-        directory_path=directory_path
-    )
-
-    retriever = csv_store.get_retriever()
-
-    response = retriever.invoke({"input": question})
-    print(response)

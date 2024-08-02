@@ -47,6 +47,18 @@ class QnA:
             ),
         )
 
+    @property
+    def csv_retriever(self):
+        from src.csv_store import CSVStore
+
+        directory_path = './data/preprocessed/csv'
+        csv_store = CSVStore(
+            llm=self.model,
+            directory_path=directory_path
+        )
+
+        return csv_store.get_retriever()
+
     def get_collection(self, collection_name: str = cfg.COLLECTION_NAME):
         client = MongoClient(cfg.CONNECTION_STRING)
         collection = client[cfg.DATABASE_NAME][collection_name]
@@ -67,20 +79,9 @@ class QnA:
         history_aware_retriever = create_history_aware_retriever(
             self.model,
             self.retriever,
+            # self.csv_retriever,
             prompts.contextualize_q_prompt
         )
-
-        # (
-        #     RunnablePassthrough.assign({"context": }}).with_config(
-        #         run_name="format_general_inputs"
-        #     )
-        #     | prompts.qa_prompt
-        #     | self.model
-        #     | StrOutputParser()
-        # ).with_config(run_name="stuff_documents_chain")
-        # router_chain =
-
-        # TODO: if context is not provided ==> using context_chain from CSV
 
         question_answer_chain = create_stuff_documents_chain(
             self.model,
