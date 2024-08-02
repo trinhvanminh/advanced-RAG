@@ -2,7 +2,6 @@ import httpx
 import pytz
 import streamlit as st
 from bson.objectid import ObjectId
-from langchain_community.vectorstores.azuresearch import AzureSearch
 
 import src.config as cfg
 from src.qna import QnA
@@ -26,16 +25,16 @@ def init_session_state(qa: QnA):
             "SessionId")
 
     if "model" not in st.session_state:
-        st.session_state.model = 'cohere'
+        st.session_state.model = 'azure-openai'
 
 
 def render_sidebar(qa: QnA):
     with st.sidebar:
         model = st.selectbox(
             "Choose a LLM",
-            tuple(cfg.llm_label_map.keys()),
-            format_func=lambda option: cfg.llm_label_map[option],
-            index=1
+            tuple(cfg.llm_options.keys()),
+            format_func=lambda option: cfg.llm_options[option]["label"],
+            index=0
         )
 
         st.session_state.model = model
@@ -105,7 +104,7 @@ def render_chat(qa: QnA):
         with st.spinner("Loading..."):
             with st.chat_message("assistant"):
 
-                qa.model = cfg.llm_map.get(st.session_state.model)
+                qa.model = cfg.llm_options[st.session_state.model].get("llm")
 
                 conversation = st.session_state.selected_conversation or ObjectId()
 
@@ -125,8 +124,12 @@ def render_chat(qa: QnA):
                     st.markdown(content)
 
                 except httpx.ConnectError:
+                    llm_option_label = cfg.llm_options[st.session_state.model].get(
+                        "label")
+
                     st.warning(
-                        f"Check your {st.session_state.model} connection")
+                        f"Check your `{llm_option_label}` connection")
+
                     return
 
         st.session_state.messages.append(
@@ -137,17 +140,8 @@ def main():
     st.set_page_config(page_title="Mortgage Assistant")
     st.title("Mortgage Assistant")
 
-    qa = QnA(
-        rerank=cfg.rerank,
-        model=cfg.default_model,
-        embeddings=cfg.azure_embeddings,
-        vector_store=AzureSearch(
-            azure_search_endpoint=cfg.AZURE_SEARCH_ENDPOINT,
-            azure_search_key=cfg.AZURE_SEARCH_KEY,
-            index_name=cfg.AZURE_SEARCH_INDEX_NAME,
-            embedding_function=cfg.azure_embeddings.embed_query,
-        ),
-    )
+    default_model = cfg.llm_options['azure-openai'].get('llm')
+    qa = QnA(rerank=cfg.rerank, model=default_model)
 
     init_session_state(qa)
     render_sidebar(qa)

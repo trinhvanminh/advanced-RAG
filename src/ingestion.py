@@ -4,9 +4,9 @@ from pathlib import Path
 from langchain_community.document_loaders import (PyMuPDFLoader, TextLoader,
                                                   UnstructuredExcelLoader,
                                                   UnstructuredMarkdownLoader)
-from langchain_core.embeddings import Embeddings
+from langchain_community.vectorstores.azure_cosmos_db import \
+    AzureCosmosDBVectorSearch
 from langchain_core.vectorstores import VectorStore
-from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from tqdm import tqdm
 
@@ -16,22 +16,17 @@ import src.config as cfg
 class Ingestion:
     def __init__(
         self,
-        embeddings: Embeddings = cfg.embeddings,
         vector_store: VectorStore | None = None,
         raw_data_folder_path: str = './data/raw/',
         preprocessed_folder_path: str = './data/preprocessed/'
     ):
-        self.embeddings = embeddings
         self.pdf_parser = cfg.pdf_parser
         self.raw_data_folder_path = raw_data_folder_path
         self.preprocessed_folder_path = preprocessed_folder_path
 
         if vector_store is None:
-            self.vector_store = MongoDBAtlasVectorSearch(
-                collection=cfg.collection,
-                embedding=self.embeddings,
-                index_name=cfg.ATLAS_VECTOR_SEARCH_INDEX_NAME,
-            )
+            self.vector_store: AzureCosmosDBVectorSearch = cfg.vector_stores(
+                'azure-cosmos')
         else:
             self.vector_store = vector_store
 
