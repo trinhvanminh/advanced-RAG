@@ -1,19 +1,24 @@
-from langchain_community.vectorstores.azuresearch import AzureSearch
+from langchain_community.vectorstores.azure_cosmos_db import (
+    AzureCosmosDBVectorSearch, CosmosDBSimilarityType,
+    CosmosDBVectorSearchType)
 
-import src.config as cfg
 from src.ingestion import Ingestion
 
-vector_store: AzureSearch = AzureSearch(
-    azure_search_endpoint=cfg.AZURE_SEARCH_ENDPOINT,
-    azure_search_key=cfg.AZURE_SEARCH_KEY,
-    index_name=cfg.AZURE_SEARCH_INDEX_NAME,
-    embedding_function=cfg.azure_embeddings.embed_query,
-)
-
-embeddings = cfg.azure_embeddings
-
-ingestion = Ingestion(embeddings=cfg.embeddings, vector_store=vector_store)
+ingestion = Ingestion()
 
 ingestion.preprocess_data()
 
-ingestion.create_and_add_embeddings()
+vector_store = ingestion.create_and_add_embeddings()
+
+if isinstance(vector_store, AzureCosmosDBVectorSearch):
+    # Read more about these variables in detail here. https://learn.microsoft.com/en-us/azure/cosmos-db/mongodb/vcore/vector-search
+    vector_store.create_index(
+        num_lists=100,
+        dimensions=1536,
+        similarity=CosmosDBSimilarityType.COS,
+        kind=CosmosDBVectorSearchType.VECTOR_IVF,
+        m=16,
+        ef_construction=64,
+        # ef_search=40,
+        # score_threshold=0.1,
+    )
