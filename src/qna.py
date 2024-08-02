@@ -76,6 +76,7 @@ class QnA:
     def ask_question(self, query: str, session_id: str):
         start_time = time.time()
 
+        # TODO: dynamic switch using [RunnableBranch](https://python.langchain.com/v0.1/docs/expression_language/how_to/routing/#using-a-runnablebranch)
         history_aware_retriever = create_history_aware_retriever(
             self.model,
             self.retriever,
