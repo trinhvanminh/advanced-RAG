@@ -51,7 +51,10 @@ def render_sidebar(qa: QnA):
 
                 with label_col:
                     # label type for active/inactive conversation
-                    label_btn_type = "primary" if conversation == st.session_state.selected_conversation else 'secondary'
+                    if conversation == st.session_state.selected_conversation:
+                        label_btn_type = "primary"
+                    else:
+                        label_btn_type = 'secondary'
 
                     if not isinstance(conversation, ObjectId):
                         # delete_conversation(qa, conversation)
