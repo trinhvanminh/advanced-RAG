@@ -5,6 +5,7 @@ from bson.objectid import ObjectId
 
 import src.config as cfg
 from src.qna import QnA
+from src.rag import RAG
 from src.utils.conversation import (create_conversation, delete_conversation,
                                     select_conversation)
 
@@ -144,7 +145,8 @@ def main():
     st.title("Mortgage Assistant")
 
     default_model = cfg.llm_options['azure-openai'].get('llm')
-    qa = QnA(rerank=cfg.rerank, model=default_model)
+    rag = RAG(model=default_model, re_rank=cfg.re_rank)
+    qa = QnA(model=default_model, retriever=rag.retriever)
 
     init_session_state(qa)
     render_sidebar(qa)
