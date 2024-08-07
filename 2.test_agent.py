@@ -24,12 +24,16 @@ class QnATool(BaseTool):
     name: str = "rag_tool"
     description: str = "Useful for when you need to query the banks/lenders documentation. Input should be a question formatted as a string."
     session_id: str = ''
-    model: Optional[BaseChatModel]
+    model: BaseChatModel
 
     def _run(self, query):
         """
         Tool for query documents
         """
+
+        if not self.model:
+            raise ValueError("LLM is not initialized")
+
         rag = RAG(model=self.model, re_rank=cfg.re_rank)
         qa = QnA(model=self.model, retriever=rag.retriever)
 
@@ -48,8 +52,8 @@ class CSVQnATool(BaseTool):
     name: str = "csv_data_tool"
     description: str = "Useful for when you need to have access to banks/lenders attributes data. Input should be a question."
     session_id: str = ''
-    model: Optional[BaseChatModel]
-    csv_store: Optional[CSVStore]
+    model: BaseChatModel
+    csv_store: CSVStore
 
     def _run(self, query):
         """
@@ -58,6 +62,9 @@ class CSVQnATool(BaseTool):
 
         if not self.csv_store:
             raise ValueError("CSV Store not initialized")
+
+        if not self.model:
+            raise ValueError("LLM is not initialized")
 
         retriever = self.csv_store.get_retriever()
         qa = QnA(model=self.model, retriever=retriever)
@@ -115,6 +122,7 @@ def agent_call(llm, query, session_id):
         tools=tools,
         verbose=True,
     )
+
     result = agent_executor.invoke({"input": query})
     logging.debug("Agent output: %s", result)
     print(result)
