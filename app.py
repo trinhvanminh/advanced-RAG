@@ -123,8 +123,10 @@ def render_chat(qa: QnA):
                         st.session_state.selected_conversation = conversation
                         st.rerun()
 
+                    # content = st.write_stream(response)
+                    print(response)
+                    # TODO: using st.write_stream()
                     content = response.get('answer')
-
                     st.markdown(content)
 
                 except httpx.ConnectError:
