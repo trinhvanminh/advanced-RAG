@@ -230,6 +230,11 @@ class QnA:
             output_messages_key="answer",
         )
 
+        # input: str,
+        # chat_history: [HumanMessage(content="what's your name"), AIMessage(content="I apologize, but I don't have a name")]
+        # context: List[Document(metadata=(source,relevance_score,..),page_content=)]
+        # answer: str ~ output_messages_key
+
         response = conversational_rag_chain.invoke(
             input={"input": query},
             config={
