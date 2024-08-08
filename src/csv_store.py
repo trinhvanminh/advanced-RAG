@@ -92,7 +92,7 @@ class CSVStore:
 
         return combined_prompt
 
-    def get_header_selection_chain(self, data: InputAndRelevantHeadersPrompt) -> RunnableSerializable[Dict, RelevantHeaders]:
+    def get_header_selection_chain(self, _data: InputAndRelevantHeadersPrompt) -> RunnableSerializable[Dict, RelevantHeaders]:
         parser = PydanticOutputParser(pydantic_object=RelevantHeaders)
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -125,7 +125,7 @@ class CSVStore:
 
         return documents
 
-    def get_retriever(self):
+    def as_retriever(self):
         file_names = os.listdir(self.directory_path)
 
         file_selection_chain = self.get_file_selection_chain(
@@ -151,3 +151,16 @@ class CSVStore:
         )
 
         return document_retriever_chain
+
+# from rich import print
+# import config as cfg
+# llm = cfg.llm_options['azure-openai'].get('llm')
+
+# retriever = CSVStore(
+#     llm=llm, directory_path='./data/preprocessed/csv/').as_retriever()
+
+
+# # print(retriever.invoke("bridging loan"))
+# for chunk in retriever.stream("bridging_loans_data"):
+#     print('chunk', chunk)
+# #
