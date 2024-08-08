@@ -1,5 +1,5 @@
 import time
-from typing import List, TypedDict
+from typing import Generator, List, TypedDict, Union
 
 from langchain.chains.combine_documents.stuff import \
     create_stuff_documents_chain
@@ -240,7 +240,7 @@ class QnA:
 
         return history_aware_retriever
 
-    def ask_question(self, query: str, session_id: str) -> QnAResponse:
+    def ask_question(self, query: str, session_id: str, stream: bool = True) -> Union[QnAResponse, Generator[QnAResponse, None, None]]:
         start_time = time.time()
 
         question_answer_chain = create_stuff_documents_chain(
@@ -268,14 +268,24 @@ class QnA:
             output_messages_key="answer",
         )
 
-        response: QnAResponse = conversational_rag_chain.invoke(
-            input={"input": query},
-            config={
-                "configurable": {
-                    "session_id": session_id,
-                }
-            },
-        )
+        if stream:
+            response: Generator[QnAResponse, None, None] = conversational_rag_chain.stream(
+                input={"input": query},
+                config={
+                    "configurable": {
+                        "session_id": session_id,
+                    }
+                },
+            )
+        else:
+            response: QnAResponse = conversational_rag_chain.invoke(
+                input={"input": query},
+                config={
+                    "configurable": {
+                        "session_id": session_id,
+                    }
+                },
+            )
 
         exec_time = time.time() - start_time
 
