@@ -13,10 +13,10 @@ class RAG:
     def __init__(
         self,
         model,
-        re_rank,
+        rerank,
         vector_store: VectorStore | None = None
     ):
-        self.re_rank = re_rank
+        self.rerank = rerank
         self.model = model
 
         # init vector store
@@ -40,7 +40,7 @@ class RAG:
             self.vector_store = vector_store
 
         self.retriever = ContextualCompressionRetriever(
-            base_compressor=self.re_rank,
+            base_compressor=self.rerank,
             base_retriever=self.vector_store.as_retriever(
                 search_type="similarity",
                 search_kwargs={

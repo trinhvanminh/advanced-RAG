@@ -33,7 +33,7 @@ def get_docs_retriever():
     )
 
     retriever = ContextualCompressionRetriever(
-        base_compressor=cfg.re_rank,
+        base_compressor=cfg.rerank,
         base_retriever=vector_store.as_retriever(
             search_type="similarity",
             search_kwargs={

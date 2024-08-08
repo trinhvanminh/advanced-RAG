@@ -117,7 +117,7 @@ vector_stores: dict[str, VectorStore] = {
     )
 }
 
-re_rank = CohereRerank(
+rerank = CohereRerank(
     model="rerank-english-v3.0",
     top_n=TOP_K
 )
