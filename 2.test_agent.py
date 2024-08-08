@@ -34,7 +34,7 @@ class QnATool(BaseTool):
         if not self.model:
             raise ValueError("LLM is not initialized")
 
-        rag = RAG(model=self.model, re_rank=cfg.re_rank)
+        rag = RAG(model=self.model, rerank=cfg.rerank)
         qa = QnA(model=self.model, retriever=rag.retriever)
 
         response = qa.ask_question(
