@@ -147,7 +147,7 @@ def main():
     st.title("Mortgage Assistant")
 
     default_model = cfg.llm_options['azure-openai'].get('llm')
-    rag = RAG(model=default_model, re_rank=cfg.re_rank)
+    rag = RAG(model=default_model, rerank=cfg.rerank)
     qa = QnA(model=default_model, retriever=rag.retriever)
 
     init_session_state(qa)
