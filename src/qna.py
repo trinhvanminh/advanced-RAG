@@ -1,10 +1,13 @@
 import time
+from typing import List, TypedDict
 
 from langchain.chains.combine_documents.stuff import \
     create_stuff_documents_chain
 from langchain.chains.history_aware_retriever import \
     create_history_aware_retriever
 from langchain.chains.retrieval import create_retrieval_chain
+from langchain_core.documents import Document
+from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import (ChatPromptTemplate,
                                     FewShotChatMessagePromptTemplate)
@@ -96,6 +99,41 @@ QUESTION_INTENT_EXAMPLES = [
         "answer": 'Malicious Query',
     },
 ]
+
+
+class QnAResponse(TypedDict):
+    """Class for QnAResponse.
+
+    Example:
+
+        .. code-block:: python
+            from langchain_core.messages import HumanMessage, AIMessage
+            from langchain_core.documents import Document
+
+            # chat_history = output_messages_key
+            # answer = output_messages_key
+            {
+                "chat_history": [HumanMessage(content="Could you..."), AIMessage(content="Yeah. I Can"), ...]
+                "context":  [
+                                Document(
+                                    metadata={
+                                        "source": "https://example.com",
+                                        "_id": null,
+                                        "vectorContent": [...],
+                                        "relevance_score": 0.9998969
+                                    }
+                                    page_content="Hello, world!"
+                                ),
+                                ....
+                            ]
+                "input": "Hello "
+                "answer": "Hi there!"
+            }
+    """
+    chat_history: List[BaseMessage]
+    context: list[Document]
+    answer: str
+    input: str
 
 
 class QnA:
@@ -202,7 +240,7 @@ class QnA:
 
         return history_aware_retriever
 
-    def ask_question(self, query: str, session_id: str):
+    def ask_question(self, query: str, session_id: str) -> QnAResponse:
         start_time = time.time()
 
         question_answer_chain = create_stuff_documents_chain(
@@ -230,12 +268,7 @@ class QnA:
             output_messages_key="answer",
         )
 
-        # input: str,
-        # chat_history: [HumanMessage(content="what's your name"), AIMessage(content="I apologize, but I don't have a name")]
-        # context: List[Document(metadata=(source,relevance_score,..),page_content=)]
-        # answer: str ~ output_messages_key
-
-        response = conversational_rag_chain.invoke(
+        response: QnAResponse = conversational_rag_chain.invoke(
             input={"input": query},
             config={
                 "configurable": {
