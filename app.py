@@ -1,13 +1,31 @@
+from typing import Generator
+
 import httpx
 import pytz
 import streamlit as st
 from bson.objectid import ObjectId
 
 import src.config as cfg
-from src.qna import QnA
+from src.qna import QnA, QnAResponse
 from src.rag import RAG
 from src.utils.conversation import (create_conversation, delete_conversation,
                                     select_conversation)
+
+
+def ai_response_wrapper(generator: Generator[QnAResponse, None, None]) -> Generator:
+    for chunk in generator:
+
+        # if 'context' in chunk:
+        #     context = chunk['context']
+        #     sources = []
+        #     for doc in context:
+        #         source = doc.metadata.get('source')
+        #         if source not in sources:
+        #             sources.append(source)
+        #     print(sources)
+
+        if 'answer' in chunk:
+            yield chunk['answer']
 
 
 def init_session_state(qa: QnA):
@@ -115,7 +133,7 @@ def render_chat(qa: QnA):
                 try:
                     response = qa.ask_question(
                         query=prompt,
-                        session_id=conversation
+                        session_id=conversation,
                     )
 
                     if conversation not in st.session_state.conversations:
@@ -123,11 +141,9 @@ def render_chat(qa: QnA):
                         st.session_state.selected_conversation = conversation
                         st.rerun()
 
-                    # content = st.write_stream(response)
-                    print(response)
-                    # TODO: using st.write_stream()
-                    content = response.get('answer')
-                    st.markdown(content)
+                    content = st.write_stream(
+                        ai_response_wrapper(response)
+                    )
 
                 except httpx.ConnectError:
                     llm_option_label = cfg.llm_options[st.session_state.model].get(
