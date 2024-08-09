@@ -93,8 +93,7 @@ class QnA:
             examples=prompts.question_intent_examples,
         )
 
-        # TODO: move these prompts to src.prompts
-        # CHECK: chat_history workable with input
+        # TODO: check chat_history workable with input
         # ==> increase the accuracy of this router chain
         final_prompt = ChatPromptTemplate.from_messages(
             [
@@ -166,17 +165,17 @@ class QnA:
                 agent=agent,
                 tools=tools,
                 verbose=True,
+                handle_parsing_errors=True
             )
 
             # TODO: move this agent out, cause it already included the answer,
             # no need to pass it as retriever
             def to_document(data):
+                print('to_document', data)
                 return [Document(page_content=data['output'])]
 
-            return agent_executor | RunnableLambda(to_document)
-
-        elif question_intent == 'malicious':
-            raise ValueError('Malicious query detected')
+            # the input is a standalone question after formulated
+            return {"input": RunnablePassthrough()} | agent_executor | RunnableLambda(to_document)
 
         return retriever
 
