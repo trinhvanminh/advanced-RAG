@@ -60,6 +60,11 @@ class InputAndRelevantHeadersPrompt(TypedDict):
     relevant_headers_prompt: str
 
 
+# TODO: make it inherrit from BaseRetriever and override these methods
+# - stream
+# - _get_relevant_documents
+#   .venv\Lib\site-packages\langchain_core\vectorstores\base.py:1244
+#   .venv/Lib/site-packages/langchain/retrievers/contextual_compression.py:29
 class CSVStore:
     def __init__(self, llm: BaseChatModel, directory_path: str):
         self.llm = llm
