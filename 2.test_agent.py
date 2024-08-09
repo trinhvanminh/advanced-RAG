@@ -80,7 +80,7 @@ class CSVQnATool(BaseTool):
         return output
 
 
-def agent_call(llm, query, session_id):
+def agent_call(llm, query):
     """
     Agent with access to document retrieval tool and PI real-time data retrieval tool, to solve the Use Case 3 milestone questions.
 
@@ -91,20 +91,26 @@ def agent_call(llm, query, session_id):
         output (dict): answer to the input question.
     """
 
-    rag_tool = QnATool(
-        model=llm,
-        session_id=session_id,
+    rag = RAG(model=default_model, rerank=cfg.rerank)
+
+    csv_store = CSVStore(
+        llm=default_model,
+        directory_path='./data/preprocessed/csv/'
     )
 
-    csv_store = CSVStore(llm=llm, directory_path='./data/preprocessed/csv/')
-
-    data_tool = CSVQnATool(
-        model=llm,
-        session_id=session_id,
-        csv_store=csv_store
+    docs_tool = create_retriever_tool(
+        rag.retriever,
+        "docs_retriever",
+        "Useful for when you need to query the banks/lenders documentation. Input should be a question formatted as a string.",
     )
 
-    tools = [rag_tool, data_tool]
+    data_tool = create_retriever_tool(
+        csv_store.as_retriever(),
+        "data_retriever",
+        "Useful for when you need to have access to banks/lenders attributes data. Input should be a question.",
+    )
+
+    tools = [docs_tool, data_tool]
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -115,22 +121,40 @@ def agent_call(llm, query, session_id):
         ]
     )
 
+    # llm_with_tools = llm.bind_tools(tools)
+
+    # from langchain_core.runnables import (
+    #     RunnablePassthrough,
+    # )
+    # from langchain.agents.format_scratchpad.tools import (
+    #     format_to_tool_messages as message_formatter
+    # )
+
+    # agent = (
+    #     RunnablePassthrough.assign(
+    #         agent_scratchpad=lambda x: message_formatter(
+    #             x["intermediate_steps"])
+    #     )
+    #     | prompt
+    #     | llm_with_tools
+    # )
+
     agent = create_tool_calling_agent(llm, tools, prompt)
 
     agent_executor = AgentExecutor(
         agent=agent,
         tools=tools,
         verbose=True,
+        handle_parsing_errors=True
     )
 
     result = agent_executor.invoke({"input": query})
     logging.debug("Agent output: %s", result)
-    print(result)
+    for chunk in result:
+        print(chunk)
 
 
 default_model = cfg.llm_options['azure-openai'].get('llm')
-SESSION_ID = '123'
 agent_call(default_model,
-           'What banks support construction loans? what is LOAN PURPOSES THAT INCLUDE CASHOUT?',
-           SESSION_ID
+           'What banks support construction loans? what is LOAN PURPOSES THAT INCLUDE CASHOUT?'
            )

@@ -1,11 +1,13 @@
 import time
-from typing import Generator, List, TypedDict, Union
+from typing import Generator, List, Optional, TypedDict, Union
 
+from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.chains.combine_documents.stuff import \
     create_stuff_documents_chain
 from langchain.chains.history_aware_retriever import \
     create_history_aware_retriever
 from langchain.chains.retrieval import create_retrieval_chain
+from langchain.tools.retriever import create_retriever_tool
 from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
@@ -20,6 +22,8 @@ from pymongo import MongoClient
 import src.config as cfg
 import src.prompts as prompts
 
+
+# TODO: move these constants to prompt
 QUESTION_INTENT_SYSTEM_PROMPT = """You are an expert of classifying intents of questions related to Bank/Lender. Use the instructions given below to determine question intent.
 Your task to classify the intent of the input query into one of the following categories:
     <category>
@@ -151,12 +155,16 @@ class QnA:
         self,
         model,
         retriever: RetrieverLike,
-        data_retriever: RetrieverLike
+        data_retriever: Optional[RetrieverLike] = None
     ):
 
         self.model = model
         self.retriever = retriever
-        self.data_retriever = data_retriever
+
+        if data_retriever is None:
+            self.data_retriever = retriever
+        else:
+            self.data_retriever = data_retriever
 
     @property
     def question_intent_chain(self):
@@ -190,8 +198,8 @@ class QnA:
         final_prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", QUESTION_INTENT_SYSTEM_PROMPT),
-                few_shot_prompt,
                 ("placeholder", "{chat_history}"),
+                few_shot_prompt,
                 ("human", "{input}"),
             ]
         )
@@ -226,14 +234,46 @@ class QnA:
         if question_intent == 'docs':
             retriever = self.retriever
         elif question_intent == 'data':
-            if self.data_retriever:
-                retriever = self.data_retriever
-            else:
-                retriever = self.retriever
-
+            retriever = self.data_retriever
         elif question_intent == 'combination':
-            # TODO: AgentExecutor with two retrievers as tools set
-            pass
+            docs_tool = create_retriever_tool(
+                self.retriever,
+                "docs_retriever",
+                "Useful for when you need to query the banks/lenders documentation. Input should be a question formatted as a string.",
+            )
+
+            data_tool = create_retriever_tool(
+                self.data_retriever,
+                "data_retriever",
+                "Useful for when you need to have access to banks/lenders attributes data. Input should be a question.",
+            )
+
+            tools = [docs_tool, data_tool]
+
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", "You are a helpful assistant"),
+                    ("placeholder", "{chat_history}"),
+                    ("human", "{input}"),
+                    ("placeholder", "{agent_scratchpad}"),
+                ]
+            )
+
+            agent = create_tool_calling_agent(self.model, tools, prompt)
+
+            agent_executor = AgentExecutor(
+                agent=agent,
+                tools=tools,
+                verbose=True,
+            )
+
+            # TODO: move this agent out, cause it already included the answer,
+            # no need to pass it as retriever
+            def to_document(data):
+                return [Document(page_content=data['output'])]
+
+            return agent_executor | RunnableLambda(to_document)
+
         elif question_intent == 'malicious':
             raise ValueError('Malicious query detected')
 
