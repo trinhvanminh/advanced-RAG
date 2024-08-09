@@ -78,6 +78,8 @@ def agent_call(llm, query):
 
 
 default_model = cfg.llm_options['azure-openai'].get('llm')
+
+# Which banks offer construction loans? What are loan purposes that include cash-out?
 agent_call(default_model,
            'What banks support construction loans? what is LOAN PURPOSES THAT INCLUDE CASHOUT?'
            )
