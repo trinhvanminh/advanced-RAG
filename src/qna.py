@@ -73,27 +73,6 @@ class QnA:
         else:
             self.data_retriever = data_retriever
 
-    @property
-    def question_intent_chain(self):
-        """
-        This function is to classify the user input intent with a few shot prompts.
-        Four categories: "Use Case 1", "Use Case 2", "Use Case 3", "Malicious Query" are the choices.
-
-        Input:
-            llm: LLM object
-            input: user's question
-        Output:
-            user input intent as a str.
-        """
-
-        question_intent_chain = (
-            prompts.question_intent_prompt
-            | self.model
-            | StrOutputParser()
-        )
-
-        return question_intent_chain
-
     @staticmethod
     def get_collection(collection_name: str = cfg.COLLECTION_NAME):
         client = MongoClient(cfg.CONNECTION_STRING)
@@ -111,8 +90,12 @@ class QnA:
         )
 
     def _retriever_router(self, data) -> RetrieverLike:
-        question_intent: str = data.get('question_intent')
+        standalone_input: str = data.get('input', '')
+        print('standalone_input', standalone_input)
+
+        question_intent: str = data.get('question_intent', '')
         print('question_intent', question_intent)
+
         question_intent = question_intent.lower()
 
         retriever = RunnableLambda(lambda _: [])
@@ -158,10 +141,27 @@ class QnA:
             # the input is a standalone question after formulated
             return {"input": RunnablePassthrough()} | agent_executor | RunnableLambda(to_document)
 
-        return retriever
+        elif question_intent == 'malicious':
+            raise ValueError("Malicious Query")
 
-    def get_history_aware_retriever(self, data) -> RetrieverOutputLike:
-        retriever = self._retriever_router(data)
+        final_chain = (lambda x: x['input']) | retriever
+        return final_chain
+
+    def get_history_aware_retriever_based_on_question_intent(self, data):
+        question_intent_chain = (
+            prompts.question_intent_prompt
+            | self.model
+            | StrOutputParser()
+        )
+
+        # the input is a standalone question after formulated
+        retriever = (
+            {
+                "input": RunnablePassthrough(),
+                "question_intent": {"input": RunnablePassthrough()} | question_intent_chain,
+            }
+            | RunnableLambda(self._retriever_router)
+        )
 
         history_aware_retriever = create_history_aware_retriever(
             llm=self.model,
@@ -179,12 +179,9 @@ class QnA:
             prompt=prompts.qa_prompt
         )
 
-        history_aware_retriever = (
-            RunnablePassthrough.assign(
-                question_intent=self.question_intent_chain
-            ).with_config(run_name="get_question_intent")
-            | RunnableLambda(self.get_history_aware_retriever)
-        ).with_config(run_name="history_aware_retriever")
+        history_aware_retriever = RunnableLambda(
+            self.get_history_aware_retriever_based_on_question_intent
+        )
 
         rag_chain = create_retrieval_chain(
             retriever=history_aware_retriever,
