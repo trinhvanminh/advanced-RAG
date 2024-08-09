@@ -1,4 +1,4 @@
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, FewShotChatMessagePromptTemplate
 
 contextualize_q_system_prompt = (
     "Given a chat history and the latest user question "
@@ -194,5 +194,32 @@ example_prompt = ChatPromptTemplate.from_messages(
     [
         ("human", "{input}"),
         ("ai", "{answer}"),
+    ]
+)
+
+# This is a prompt template used to format each individual example.
+few_shot_prompt = FewShotChatMessagePromptTemplate(
+    input_variables=["input"],
+    example_prompt=example_prompt,
+    examples=question_intent_examples,
+)
+
+# TODO: check chat_history workable with input
+# ==> increase the accuracy of this router chain
+question_intent_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", question_intent_system_prompt),
+        ("placeholder", "{chat_history}"),
+        few_shot_prompt,
+        ("human", "{input}"),
+    ]
+)
+
+tool_calling_agent_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", "You are a helpful assistant"),
+        ("placeholder", "{chat_history}"),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}"),
     ]
 )
