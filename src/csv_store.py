@@ -11,32 +11,7 @@ from langchain_core.retrievers import RetrieverOutput
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.runnables.base import RunnableSerializable
 
-
-FILE_SELECTION_PROMPT = (
-    "You have a list of CSV file names with information on various financial products and services. "
-    "Select up to 2 file names in the list that would be most helpful to answer user input. "
-    "DO NOT generate new file names, ONLY select on provided file names. "
-    "Wrap the output between ```json and ```"
-    "{format_instructions} "
-    "\nList of CSV file names:"
-    "\n"
-    "{file_names}"
-)
-
-HEADER_SELECTION_PROMPT = (
-    "You have a list of CSV file names and sample rows from each file. "
-    "Based on the user input, identify the most helpful headers from the sample rows to answer the query. "
-    "Provide a list of these headers or an empty list if no helpful headers are found."
-    "Wrap the output between ```json and ```"
-    "{format_instructions}"
-    "\n"
-    "{relevant_headers_prompt}"
-)
-
-FINAL_QUERY_PROMPT = (
-    "Based on the context answer the user input",
-    "{context}"
-)
+import src.prompts as prompts
 
 
 class RelevantHeader(BaseModel):
@@ -74,7 +49,7 @@ class CSVStore:
         parser = PydanticOutputParser(pydantic_object=FileNames)
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", FILE_SELECTION_PROMPT),
+                ("system", prompts.file_selection_prompt),
                 ("human", "{input}")
             ]
         ).partial(format_instructions=parser.get_format_instructions(), file_names=file_names)
@@ -101,7 +76,7 @@ class CSVStore:
         parser = PydanticOutputParser(pydantic_object=RelevantHeaders)
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", HEADER_SELECTION_PROMPT),
+                ("system", prompts.header_selection_prompt),
                 ("human", "{input}")
             ]
         ).partial(format_instructions=parser.get_format_instructions())
