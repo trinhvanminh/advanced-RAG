@@ -11,8 +11,7 @@ from langchain.tools.retriever import create_retriever_tool
 from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import (ChatPromptTemplate,
-                                    FewShotChatMessagePromptTemplate)
+
 from langchain_core.retrievers import RetrieverLike, RetrieverOutputLike
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -86,25 +85,12 @@ class QnA:
         Output:
             user input intent as a str.
         """
-        # This is a prompt template used to format each individual example.
-        few_shot_prompt = FewShotChatMessagePromptTemplate(
-            input_variables=["input"],
-            example_prompt=prompts.example_prompt,
-            examples=prompts.question_intent_examples,
-        )
 
-        # TODO: check chat_history workable with input
-        # ==> increase the accuracy of this router chain
-        final_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", prompts.question_intent_system_prompt),
-                ("placeholder", "{chat_history}"),
-                few_shot_prompt,
-                ("human", "{input}"),
-            ]
+        question_intent_chain = (
+            prompts.question_intent_prompt
+            | self.model
+            | StrOutputParser()
         )
-
-        question_intent_chain = final_prompt | self.model | StrOutputParser()
 
         return question_intent_chain
 
@@ -150,16 +136,11 @@ class QnA:
 
             tools = [docs_tool, data_tool]
 
-            prompt = ChatPromptTemplate.from_messages(
-                [
-                    ("system", "You are a helpful assistant"),
-                    ("placeholder", "{chat_history}"),
-                    ("human", "{input}"),
-                    ("placeholder", "{agent_scratchpad}"),
-                ]
+            agent = create_tool_calling_agent(
+                self.model,
+                tools,
+                prompts.tool_calling_agent_prompt
             )
-
-            agent = create_tool_calling_agent(self.model, tools, prompt)
 
             agent_executor = AgentExecutor(
                 agent=agent,
