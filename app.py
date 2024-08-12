@@ -6,7 +6,7 @@ import streamlit as st
 from bson.objectid import ObjectId
 
 import src.config as cfg
-from src.csv_store import CSVStore
+from src.csv_store import CSVRetriever
 from src.qna import QnA, QnAResponse
 from src.rag import RAG
 from src.utils.conversation import (create_conversation, delete_conversation,
@@ -135,14 +135,14 @@ def render_chat(qa: QnA):
                     response = qa.ask_question(
                         query=prompt,
                         session_id=conversation,
-                        stream=False
+                        stream=True
                     )
 
-                    # content = st.write_stream(
-                    #     ai_response_wrapper(response)
-                    # )
+                    content = st.write_stream(
+                        ai_response_wrapper(response)
+                    )
 
-                    content = st.markdown(response["answer"])
+                    # content = st.markdown(response["answer"])
 
                     st.session_state.messages.append(
                         {"role": "assistant", "content": content}
@@ -172,7 +172,7 @@ def main():
 
     rag = RAG(model=default_model, rerank=cfg.rerank)
 
-    csv_store = CSVStore(
+    csv_retriever = CSVRetriever(
         llm=default_model,
         directory_path='./data/preprocessed/csv/'
     )
@@ -180,7 +180,7 @@ def main():
     qa = QnA(
         model=default_model,
         retriever=rag.retriever,
-        data_retriever=csv_store.as_retriever()
+        data_retriever=csv_retriever
     )
 
     init_session_state(qa)
