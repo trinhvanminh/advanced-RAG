@@ -141,9 +141,6 @@ class QnA:
             # the input is a standalone question after formulated
             return {"input": RunnablePassthrough()} | agent_executor | RunnableLambda(to_document)
 
-        elif question_intent == 'malicious':
-            raise ValueError("Malicious Query")
-
         final_chain = (lambda x: x['input']) | retriever
         return final_chain
 
