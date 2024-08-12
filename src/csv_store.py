@@ -1,13 +1,14 @@
 import os
-from typing import Dict, List, TypedDict
+from typing import Any, Dict, List, TypedDict
 
 import pandas as pd
+from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
-from langchain_core.retrievers import RetrieverOutput
+from langchain_core.retrievers import BaseRetriever, RetrieverOutput
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.runnables.base import RunnableSerializable
 
@@ -35,15 +36,9 @@ class InputAndRelevantHeadersPrompt(TypedDict):
     relevant_headers_prompt: str
 
 
-# TODO: make it inherrit from BaseRetriever and override these methods
-# - stream
-# - _get_relevant_documents
-#   .venv\Lib\site-packages\langchain_core\vectorstores\base.py:1244
-#   .venv/Lib/site-packages/langchain/retrievers/contextual_compression.py:29
-class CSVStore:
-    def __init__(self, llm: BaseChatModel, directory_path: str):
-        self.llm = llm
-        self.directory_path = directory_path
+class CSVRetriever(BaseRetriever):
+    llm: BaseChatModel
+    directory_path: str
 
     def get_file_selection_chain(self, file_names: List[str]) -> RunnableSerializable[Dict, FileNames]:
         parser = PydanticOutputParser(pydantic_object=FileNames)
@@ -105,7 +100,8 @@ class CSVStore:
 
         return documents
 
-    def as_retriever(self):
+    @property
+    def retriever(self):
         file_names = os.listdir(self.directory_path)
 
         file_selection_chain = self.get_file_selection_chain(
@@ -132,15 +128,27 @@ class CSVStore:
 
         return document_retriever_chain
 
-# from rich import print
-# import config as cfg
-# llm = cfg.llm_options['azure-openai'].get('llm')
+    def _get_relevant_documents(
+        self,
+        query: str,
+        *,
+        run_manager: CallbackManagerForRetrieverRun,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """Get documents relevant for a query.
 
-# retriever = CSVStore(
-#     llm=llm, directory_path='./data/preprocessed/csv/').as_retriever()
+         Args:
+             query: string to find relevant documents for
 
+         Returns:
+             Sequence of relevant documents
+         """
+        docs = self.retriever.invoke(
+            query,
+            config={
+                "callbacks": run_manager.get_child()
+            },
+            **kwargs
+        )
 
-# # print(retriever.invoke("bridging loan"))
-# for chunk in retriever.stream("bridging_loans_data"):
-#     print('chunk', chunk)
-# #
+        return docs
