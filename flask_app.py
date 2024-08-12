@@ -11,7 +11,6 @@ from src.rag import RAG
 from src.utils.conversation import _parse_llm_messages
 
 app = Flask(__name__)
-app = Flask(__name__)
 CORS(app)
 
 
@@ -65,6 +64,23 @@ def chat():
     })
 
 
+def fake_stream():
+    for i in range(10):
+        data = json.dumps({
+            "response": {
+                "answer": f"Answer {i}",
+                "chat_history": [],
+                "context": []
+            },
+            "status": "Success"
+        })
+
+        #  Convert the event object to a string
+        msg = f'id: {1}\ndata: {data}\n\n'
+
+        yield msg
+
+
 def stream_parser(response):
     context = []
     chat_history = []
@@ -107,13 +123,17 @@ def stream():
 
     qa: QnA = get_qna()
 
+    # response = None
     response: QnAResponse = qa.ask_question(
         query=query,
         session_id=session_id,
         stream=True
     )
 
-    return app.response_class(stream_parser(response), content_type='text/event-stream')
+    if response:
+        return app.response_class(stream_parser(response), content_type='text/event-stream')
+    else:
+        return app.response_class(fake_stream(), content_type='text/event-stream')
 
 
 if __name__ == "__main__":
