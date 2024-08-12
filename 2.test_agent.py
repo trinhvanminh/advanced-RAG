@@ -15,7 +15,7 @@ from langchain_core.tools import BaseTool, StructuredTool, tool
 
 from src.rag import RAG
 import src.config as cfg
-from src.csv_store import CSVStore
+from src.csv_retriever import CSVRetriever
 from src.qna import QnA
 from rich import print
 
@@ -33,7 +33,7 @@ def agent_call(llm, query):
 
     rag = RAG(model=default_model, rerank=cfg.rerank)
 
-    csv_store = CSVStore(
+    csv_retriever = CSVRetriever(
         llm=default_model,
         directory_path='./data/preprocessed/csv/'
     )
@@ -45,7 +45,7 @@ def agent_call(llm, query):
     )
 
     data_tool = create_retriever_tool(
-        csv_store.as_retriever(),
+        csv_retriever,
         "data_retriever",
         "Useful for when you need to have access to banks/lenders attributes data. Input should be a question.",
     )

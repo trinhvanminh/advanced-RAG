@@ -6,7 +6,7 @@ import streamlit as st
 from bson.objectid import ObjectId
 
 import src.config as cfg
-from src.csv_store import CSVRetriever
+from src.csv_retriever import CSVRetriever
 from src.qna import QnA, QnAResponse
 from src.rag import RAG
 from src.utils.conversation import (create_conversation, delete_conversation,
