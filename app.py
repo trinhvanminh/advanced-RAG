@@ -1,6 +1,7 @@
 from typing import Generator
 
 import httpx
+from openai import BadRequestError
 import pytz
 import streamlit as st
 from bson.objectid import ObjectId
@@ -155,13 +156,19 @@ def render_chat(qa: QnA):
                         st.rerun()
 
                 except httpx.ConnectError:
-                    llm_option_label = cfg.llm_options[st.session_state.model].get(
-                        "label")
+                    llm_option_label = (
+                        cfg.llm_options[st.session_state.model]
+                        .get("label")
+                    )
 
                     st.warning(
-                        f"Check your `{llm_option_label}` connection")
-
-                    return
+                        f"Check your `{llm_option_label}` connection"
+                    )
+                except BadRequestError as e:
+                    print(e.body['innererror']['content_filter_result'])
+                    st.error(e.body['message'])
+                except Exception as e:
+                    st.error(e)
 
 
 def main():
