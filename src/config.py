@@ -99,12 +99,12 @@ llm_options: dict[str, LLMOption] = {
 }
 
 vector_stores: dict[str, VectorStore] = {
-    "azure-search": AzureSearch(
-        azure_search_endpoint=os.getenv('AZURE_SEARCH_ENDPOINT'),
-        azure_search_key=os.getenv('AZURE_SEARCH_KEY'),
-        embedding_function=embedding_models["azure"].embed_query,
-        index_name=os.getenv('VECTOR_SEARCH_INDEX_NAME'),
-    ),
+    # "azure-search": AzureSearch(
+    #     azure_search_endpoint=os.getenv('AZURE_SEARCH_ENDPOINT'),
+    #     azure_search_key=os.getenv('AZURE_SEARCH_KEY'),
+    #     embedding_function=embedding_models["azure"].embed_query,
+    #     index_name=os.getenv('VECTOR_SEARCH_INDEX_NAME'),
+    # ),
     "mongo-atlas": MongoDBAtlasVectorSearch(
         collection=collection,
         embedding=embedding_models["google"],
