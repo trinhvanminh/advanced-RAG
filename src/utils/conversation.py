@@ -1,7 +1,10 @@
+from typing import List
+
 import streamlit as st
-from src.qna import QnA
-from langchain_core.messages.ai import AIMessage
+from langchain_core.messages import BaseMessage
 from langchain_core.messages.human import HumanMessage
+
+from src.qna import QnA
 
 
 def delete_conversation(qa: QnA, session_id: str):
@@ -20,7 +23,7 @@ def delete_conversation(qa: QnA, session_id: str):
         st.session_state.selected_conversation = ''
 
 
-def _parse_llm_messages(messages: list[HumanMessage | AIMessage]):
+def _parse_llm_messages(messages: List[BaseMessage]):
     return [{"role": "user" if isinstance(msg, HumanMessage) else "assistant", "content": msg.content} for msg in messages]
 
 

@@ -1,42 +1,18 @@
 import os
-from typing import Dict, List, TypedDict
+from typing import Any, Dict, List, TypedDict
 
 import pandas as pd
+from langchain_core.callbacks.manager import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
-from langchain_core.retrievers import RetrieverOutput
+from langchain_core.retrievers import BaseRetriever, RetrieverOutput
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.runnables.base import RunnableSerializable
 
-
-FILE_SELECTION_PROMPT = (
-    "You have a list of CSV file names with information on various financial products and services. "
-    "Select up to 2 file names in the list that would be most helpful to answer user input. "
-    "DO NOT generate new file names, ONLY select on provided file names. "
-    "Wrap the output between ```json and ```"
-    "{format_instructions} "
-    "\nList of CSV file names:"
-    "\n"
-    "{file_names}"
-)
-
-HEADER_SELECTION_PROMPT = (
-    "You have a list of CSV file names and sample rows from each file. "
-    "Based on the user input, identify the most helpful headers from the sample rows to answer the query. "
-    "Provide a list of these headers or an empty list if no helpful headers are found."
-    "Wrap the output between ```json and ```"
-    "{format_instructions}"
-    "\n"
-    "{relevant_headers_prompt}"
-)
-
-FINAL_QUERY_PROMPT = (
-    "Based on the context answer the user input",
-    "{context}"
-)
+import src.prompts as prompts
 
 
 class RelevantHeader(BaseModel):
@@ -60,16 +36,15 @@ class InputAndRelevantHeadersPrompt(TypedDict):
     relevant_headers_prompt: str
 
 
-class CSVStore:
-    def __init__(self, llm: BaseChatModel, directory_path: str):
-        self.llm = llm
-        self.directory_path = directory_path
+class CSVRetriever(BaseRetriever):
+    llm: BaseChatModel
+    directory_path: str
 
     def get_file_selection_chain(self, file_names: List[str]) -> RunnableSerializable[Dict, FileNames]:
         parser = PydanticOutputParser(pydantic_object=FileNames)
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", FILE_SELECTION_PROMPT),
+                ("system", prompts.file_selection_prompt),
                 ("human", "{input}")
             ]
         ).partial(format_instructions=parser.get_format_instructions(), file_names=file_names)
@@ -92,11 +67,11 @@ class CSVStore:
 
         return combined_prompt
 
-    def get_header_selection_chain(self, data: InputAndRelevantHeadersPrompt) -> RunnableSerializable[Dict, RelevantHeaders]:
+    def get_header_selection_chain(self, _data: InputAndRelevantHeadersPrompt) -> RunnableSerializable[Dict, RelevantHeaders]:
         parser = PydanticOutputParser(pydantic_object=RelevantHeaders)
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", HEADER_SELECTION_PROMPT),
+                ("system", prompts.header_selection_prompt),
                 ("human", "{input}")
             ]
         ).partial(format_instructions=parser.get_format_instructions())
@@ -125,7 +100,8 @@ class CSVStore:
 
         return documents
 
-    def get_retriever(self):
+    @property
+    def retriever(self):
         file_names = os.listdir(self.directory_path)
 
         file_selection_chain = self.get_file_selection_chain(
@@ -151,3 +127,28 @@ class CSVStore:
         )
 
         return document_retriever_chain
+
+    def _get_relevant_documents(
+        self,
+        query: str,
+        *,
+        run_manager: CallbackManagerForRetrieverRun,
+        **kwargs: Any,
+    ) -> List[Document]:
+        """Get documents relevant for a query.
+
+         Args:
+             query: string to find relevant documents for
+
+         Returns:
+             Sequence of relevant documents
+         """
+        docs = self.retriever.invoke(
+            query,
+            config={
+                "callbacks": run_manager.get_child()
+            },
+            **kwargs
+        )
+
+        return docs
