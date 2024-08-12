@@ -11,7 +11,7 @@ from langchain_core.vectorstores import VectorStore
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings, ChatOpenAI
 
 import src.config as cfg
-from src.csv_store import CSVStore
+from src.csv_retriever import CSVRetriever
 
 load_dotenv()
 
@@ -51,7 +51,9 @@ def get_csv_retriever():
         api_version="2024-05-01-preview",
         temperature=cfg.TEMPERATURE
     )
-    csv_store = CSVStore(llm=llm, directory_path='./data/preprocessed/csv/')
-    csv_retriever = csv_store.get_retriever()
+    csv_retriever = CSVRetriever(
+        llm=llm,
+        directory_path='./data/preprocessed/csv/'
+    )
 
     return csv_retriever
