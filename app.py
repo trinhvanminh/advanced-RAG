@@ -1,12 +1,33 @@
+from typing import Generator
+
 import httpx
+from openai import BadRequestError
 import pytz
 import streamlit as st
 from bson.objectid import ObjectId
 
 import src.config as cfg
-from src.qna import QnA
+from src.csv_retriever import CSVRetriever
+from src.qna import QnA, QnAResponse
+from src.rag import RAG
 from src.utils.conversation import (create_conversation, delete_conversation,
                                     select_conversation)
+
+
+def ai_response_wrapper(generator: Generator[QnAResponse, None, None]) -> Generator:
+    for chunk in generator:
+
+        # if 'context' in chunk:
+        #     context = chunk['context']
+        #     sources = []
+        #     for doc in context:
+        #         source = doc.metadata.get('source')
+        #         if source not in sources:
+        #             sources.append(source)
+        #     print(sources)
+
+        if 'answer' in chunk:
+            yield chunk['answer']
 
 
 def init_session_state(qa: QnA):
@@ -51,7 +72,10 @@ def render_sidebar(qa: QnA):
 
                 with label_col:
                     # label type for active/inactive conversation
-                    label_btn_type = "primary" if conversation == st.session_state.selected_conversation else 'secondary'
+                    if conversation == st.session_state.selected_conversation:
+                        label_btn_type = "primary"
+                    else:
+                        label_btn_type = 'secondary'
 
                     if not isinstance(conversation, ObjectId):
                         # delete_conversation(qa, conversation)
@@ -111,29 +135,40 @@ def render_chat(qa: QnA):
                 try:
                     response = qa.ask_question(
                         query=prompt,
-                        session_id=conversation
+                        session_id=conversation,
+                        stream=True
                     )
 
+                    content = st.write_stream(
+                        ai_response_wrapper(response)
+                    )
+
+                    # content = st.markdown(response["answer"])
+
+                    st.session_state.messages.append(
+                        {"role": "assistant", "content": content}
+                    )
+
+                    # rerun to rerender sidebar with new conversations as selected_conversation
                     if conversation not in st.session_state.conversations:
                         st.session_state.conversations.append(conversation)
                         st.session_state.selected_conversation = conversation
                         st.rerun()
 
-                    content = response.get('answer')
-
-                    st.markdown(content)
-
                 except httpx.ConnectError:
-                    llm_option_label = cfg.llm_options[st.session_state.model].get(
-                        "label")
+                    llm_option_label = (
+                        cfg.llm_options[st.session_state.model]
+                        .get("label")
+                    )
 
                     st.warning(
-                        f"Check your `{llm_option_label}` connection")
-
-                    return
-
-        st.session_state.messages.append(
-            {"role": "assistant", "content": content})
+                        f"Check your `{llm_option_label}` connection"
+                    )
+                except BadRequestError as e:
+                    print(e.body['innererror']['content_filter_result'])
+                    st.error(e.body['message'])
+                except Exception as e:
+                    st.error(e)
 
 
 def main():
@@ -141,7 +176,19 @@ def main():
     st.title("Mortgage Assistant")
 
     default_model = cfg.llm_options['azure-openai'].get('llm')
-    qa = QnA(rerank=cfg.rerank, model=default_model)
+
+    rag = RAG(model=default_model, rerank=cfg.rerank)
+
+    csv_retriever = CSVRetriever(
+        llm=default_model,
+        directory_path='./data/preprocessed/csv/'
+    )
+
+    qa = QnA(
+        model=default_model,
+        retriever=rag.retriever,
+        data_retriever=csv_retriever
+    )
 
     init_session_state(qa)
     render_sidebar(qa)
