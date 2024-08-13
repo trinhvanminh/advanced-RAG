@@ -8,7 +8,7 @@ import src.config as cfg
 from src.csv_retriever import CSVRetriever
 from src.qna import QnA, QnAResponse
 from src.rag import RAG
-from src.utils.conversation import _parse_llm_messages
+from src.utils.conversation import parse_llm_messages
 
 app = Flask(__name__)
 CORS(app)
@@ -50,7 +50,7 @@ def chat():
     return jsonify({
         "response": {
             "answer": response['answer'],
-            "chat_history": _parse_llm_messages(response['chat_history']),
+            "chat_history": parse_llm_messages(response['chat_history']),
             "context": [
                 {
                     "source": doc.metadata['source'],
@@ -97,7 +97,7 @@ def stream_parser(response):
                 ])
 
         if 'chat_history' in chunk:
-            chat_history = _parse_llm_messages(chunk['chat_history'])
+            chat_history = parse_llm_messages(chunk['chat_history'])
 
         answer = chunk.get('answer', '')
         data = json.dumps({
