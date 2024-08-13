@@ -23,13 +23,13 @@ def delete_conversation(qa: QnA, session_id: str):
         st.session_state.selected_conversation = ''
 
 
-def _parse_llm_messages(messages: List[BaseMessage]):
+def parse_llm_messages(messages: List[BaseMessage]):
     return [{"role": "user" if isinstance(msg, HumanMessage) else "assistant", "content": msg.content} for msg in messages]
 
 
 def _load_messages(qa: QnA, session_id: str):
     session_history = qa.get_session_history(session_id=session_id)
-    st.session_state.messages = _parse_llm_messages(session_history.messages)
+    st.session_state.messages = parse_llm_messages(session_history.messages)
 
 
 def select_conversation(qa: QnA, session_id: str):
