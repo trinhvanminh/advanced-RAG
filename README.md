@@ -8,6 +8,10 @@
 
 `python flask_app.py`
 
+## Inspiration 
+![image](https://github.com/user-attachments/assets/39918a3f-4189-4f49-bf43-86088e8d4d2f)
+
+
 ## Keywords and docs
 
 ### RAG (retrieval-augmented generation):
