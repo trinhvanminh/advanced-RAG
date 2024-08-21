@@ -172,6 +172,7 @@ def render_chat(qa: QnA):
                     print(e.body['innererror']['content_filter_result'])
                     st.error(e.body['message'])
                 except Exception as e:
+                    print('================e', e)
                     st.error(e)
 
 
