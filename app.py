@@ -173,7 +173,7 @@ def render_chat(qa: QnA):
                     st.error(e.body['message'])
                 except Exception as e:
                     print('================e', e)
-                    st.error(e)
+                    st.json(e)
 
 
 def main():
