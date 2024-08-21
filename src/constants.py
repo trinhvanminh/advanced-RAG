@@ -7,6 +7,7 @@ load_dotenv(override=True)
 
 
 getenv = st.secrets.get
+# getenv = os.getenv
 
 LLAMA_PARSE = getenv('LLAMA_PARSE')
 
