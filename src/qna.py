@@ -18,7 +18,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
 from pymongo import MongoClient
 
-import src.config as cfg
+import src.constants as c
 import src.prompts as prompts
 
 
@@ -74,9 +74,9 @@ class QnA:
             self.data_retriever = data_retriever
 
     @staticmethod
-    def get_collection(collection_name: str = cfg.COLLECTION_NAME):
-        client = MongoClient(cfg.CONNECTION_STRING)
-        collection = client[cfg.DATABASE_NAME][collection_name]
+    def get_collection(collection_name: str = c.COLLECTION_NAME):
+        client = MongoClient(c.CONNECTION_STRING)
+        collection = client[c.DATABASE_NAME][collection_name]
 
         return collection
 
@@ -84,9 +84,9 @@ class QnA:
     def get_session_history(session_id: str) -> MongoDBChatMessageHistory:
         return MongoDBChatMessageHistory(
             session_id=session_id,
-            connection_string=cfg.CONNECTION_STRING,
-            database_name=cfg.DATABASE_NAME,
-            collection_name=cfg.HISTORY_COLLECTION_NAME or 'message_store',
+            connection_string=c.CONNECTION_STRING,
+            database_name=c.DATABASE_NAME,
+            collection_name=c.HISTORY_COLLECTION_NAME or 'message_store',
         )
 
     def _retriever_router(self, data) -> RetrieverLike:
@@ -135,7 +135,7 @@ class QnA:
             # TODO: move this agent out, cause it already included the answer,
             # no need to pass it as retriever
             def to_document(data):
-                print('to_document', data)
+                # print('to_document', data)
                 return [Document(page_content=data['output'])]
 
             # the input is a standalone question after formulated

@@ -4,3 +4,5 @@ drafts
 .env
 data/
 .idea
+
+.streamlit
