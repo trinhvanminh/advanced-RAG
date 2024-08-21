@@ -51,9 +51,13 @@ def init_session_state(qa: QnA):
 
 def render_sidebar(qa: QnA):
     with st.sidebar:
+
+        filtered_llm_options = (key for key, value in cfg.llm_options.items(
+        ) if not value.get("disabled", False))
+
         model = st.selectbox(
             "Choose a LLM",
-            tuple(cfg.llm_options.keys()),
+            filtered_llm_options,
             format_func=lambda option: cfg.llm_options[option]["label"],
             index=0
         )
