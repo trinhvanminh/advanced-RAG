@@ -1,0 +1,13 @@
+docs/
+examples/
+data/
+.venv
+__pycache__
+*.md
+
+Dockerfile
+.dockerignore
+
+drafts
+.env
+.idea
