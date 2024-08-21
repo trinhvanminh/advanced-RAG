@@ -21,6 +21,5 @@ pymongo==4.8.0
 python-dotenv==1.0.1
 pytz==2024.1
 rich==13.7.1
-streamlit==1.35.0
 streamlit==1.36.0
 tqdm==4.66.4
