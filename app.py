@@ -173,6 +173,15 @@ def render_chat(qa: QnA):
                     st.error(e.body['message'])
                 except Exception as e:
                     print('================e', e)
+                    import logging
+                    from logging import getLogger
+
+                    app_logger = getLogger()
+                    app_logger.addHandler(logging.StreamHandler())
+                    app_logger.setLevel(logging.INFO)
+                    app_logger.info("best")
+                    app_logger.info(e)
+                    st._update_logger.error(e)
                     st.markdown(e)
 
 
