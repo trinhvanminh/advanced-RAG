@@ -3,7 +3,6 @@ from typing import TypedDict
 from langchain_cohere import ChatCohere, CohereRerank
 from langchain_community.vectorstores.azure_cosmos_db import \
     AzureCosmosDBVectorSearch
-from langchain_community.vectorstores.azuresearch import AzureSearch
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.vectorstores import VectorStore
@@ -80,12 +79,6 @@ llm_options: dict[str, LLMOption] = {
 
 
 vector_stores: dict[str, VectorStore] = {
-    # "azure-search": AzureSearch(
-    #     azure_search_endpoint=os.getenv('AZURE_SEARCH_ENDPOINT'),
-    #     azure_search_key=os.getenv('AZURE_SEARCH_KEY'),
-    #     embedding_function=embedding_models["azure"].embed_query,
-    #     index_name=os.getenv('VECTOR_SEARCH_INDEX_NAME'),
-    # ),
     "mongo-atlas": MongoDBAtlasVectorSearch(
         collection=collection,
         embedding=embedding_models["google"],
