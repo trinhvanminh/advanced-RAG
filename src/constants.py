@@ -1,5 +1,4 @@
 import os
-from rich import print
 import streamlit as st
 from dotenv import load_dotenv
 
