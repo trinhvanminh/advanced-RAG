@@ -18,8 +18,15 @@ langchain-ollama==0.1.0
 rich==13.7.1
 pandas==2.2.2
 tqdm==4.66.4
-llama-parse==0.4.9
 openpyxl==3.1.5
 pymongo==4.8.0
+
+llama-index-core==0.10.55
+llama-parse==0.4.9
+
 python-dotenv==1.0.1
 streamlit==1.36.0
+
+azure-storage-blob==12.22.0
+azure-identity==1.17.1
+adlfs==2024.7.0
