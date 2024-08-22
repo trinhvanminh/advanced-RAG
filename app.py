@@ -1,11 +1,11 @@
 from typing import Generator
 
+import logging
 import httpx
 from openai import BadRequestError
 import pytz
 import streamlit as st
 from bson.objectid import ObjectId
-from streamlit.logger import get_logger
 
 from src.csv_retriever import CSVRetriever
 from src.qna import QnA, QnAResponse
@@ -16,7 +16,7 @@ from src.utils.conversation import (create_conversation, delete_conversation,
 import src.config as cfg
 import src.constants as c
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def ai_response_wrapper(generator: Generator[QnAResponse, None, None]) -> Generator:
