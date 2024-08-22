@@ -1,3 +1,4 @@
+import os
 from typing import Generator
 
 import logging
@@ -202,9 +203,19 @@ def render_chat(qa: QnA):
                     )
 
 
+def set_up_langsmith_env():
+    os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
+    os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
+    os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
+    os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
+
+
 def main():
     st.set_page_config(page_title="Mortgage Broker Assistant")
     st.title("Mortgage Broker Assistant")
+
+    # Set LangSmith environment variables
+    set_up_langsmith_env()
 
     default_model = cfg.llm_options['azure-openai'].get('llm')
 
