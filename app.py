@@ -175,8 +175,16 @@ def render_chat(qa: QnA):
                         f"Check your `{llm_option_label}` connection"
                     )
                 except BadRequestError as e:
-                    print(e.body['innererror']['content_filter_result'])
-                    st.error(e.body['message'])
+                    print("e.body", e.body)
+                    print("e.body['message']", e.body['message'])
+                    # print(e.body['innererror']['content_filter_result'])
+                    if e.body.get('code', '') == 'string_above_max_length':
+                        st.error(
+                            'It seems the question is too complex for me to process. '
+                            'Please try splitting it into multiple simpler questions.'
+                        )
+                    else:
+                        st.error(e.body['message'])
 
 
 def main():
