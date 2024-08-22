@@ -5,6 +5,7 @@ from openai import BadRequestError
 import pytz
 import streamlit as st
 from bson.objectid import ObjectId
+from streamlit.logger import get_logger
 
 from src.csv_retriever import CSVRetriever
 from src.qna import QnA, QnAResponse
@@ -14,6 +15,8 @@ from src.utils.conversation import (create_conversation, delete_conversation,
 
 import src.config as cfg
 import src.constants as c
+
+logger = get_logger(__name__)
 
 
 def ai_response_wrapper(generator: Generator[QnAResponse, None, None]) -> Generator:
@@ -166,6 +169,7 @@ def render_chat(qa: QnA):
                         st.rerun()
 
                 except httpx.ConnectError:
+                    logger.error(e)
                     llm_option_label = (
                         cfg.llm_options[st.session_state.model]
                         .get("label")
@@ -175,6 +179,7 @@ def render_chat(qa: QnA):
                         f"Check your `{llm_option_label}` connection"
                     )
                 except BadRequestError as e:
+                    logger.error(e)
                     print("e.body", e.body)
                     print("e.body['message']", e.body['message'])
                     # print(e.body['innererror']['content_filter_result'])
@@ -190,6 +195,7 @@ def render_chat(qa: QnA):
                         )
                 except Exception as e:
                     print('Exception', e)
+                    logger.error(e)
                     st.error(
                         "Something went wrong, please try again. "
                         "If the problem persists, please contact the administrator."
@@ -206,9 +212,9 @@ def main():
 
     csv_retriever = CSVRetriever(
         llm=default_model,
-        # directory_path=c.AZURE_STORAGE_CONTAINER,
-        directory_path='./data/preprocessed/csv/',
-        # connection_string=c.AZURE_STORAGE_CONNECTION_STRING
+        directory_path=c.AZURE_STORAGE_CONTAINER,
+        # directory_path='./data/preprocessed/csv/',
+        connection_string=c.AZURE_STORAGE_CONNECTION_STRING
     )
 
     qa = QnA(
