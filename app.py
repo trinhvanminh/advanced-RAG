@@ -29,7 +29,7 @@ def ai_response_wrapper(generator: Generator[QnAResponse, None, None]) -> Genera
         #     print(sources)
 
         if 'answer' in chunk:
-            yield chunk['answer']
+            yield chunk['answer'].replace("$", "\$")
 
 
 def init_session_state(qa: QnA):
