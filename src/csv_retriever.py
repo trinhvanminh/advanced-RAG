@@ -121,9 +121,21 @@ class CSVRetriever(BaseRetriever):
                     storage_options=self.storage_options
                 )
 
-                data = (df[relevant_header.headers]
-                        .drop_duplicates()
-                        .to_markdown(index=False))
+                print('relevant_header.headers', relevant_header.headers)
+
+                valid_headers = []
+                for col in relevant_header.headers:
+                    if col in df.columns:
+                        valid_headers.append(col)
+
+                print('valid_headers', valid_headers)
+
+                if len(valid_headers) > 0:
+                    data = (df[valid_headers]
+                            .drop_duplicates()
+                            .to_markdown(index=False))
+                else:
+                    data = ''
 
                 document = Document(
                     page_content=data,
