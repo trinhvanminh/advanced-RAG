@@ -7,6 +7,7 @@ from openai import BadRequestError
 import pytz
 import streamlit as st
 from bson.objectid import ObjectId
+from streamlit_feedback import streamlit_feedback
 
 from src.csv_retriever import CSVRetriever
 from src.qna import QnA, QnAResponse
@@ -123,84 +124,93 @@ def render_chat(qa: QnA):
     # Display chat messages from history on app rerun
     for message in st.session_state.messages:
         content: str = message.get("content", "").replace("$", "\$")
-        with st.chat_message(message["role"]):
-            if message["role"] == 'user':
+        role = message["role"]
+        if role == 'user':
+            with st.chat_message("user"):
                 st.write(content)
-            else:
+        else:
+            with st.chat_message("assistant", avatar="✨"):
                 st.markdown(content)
 
     # Accept user input
     if prompt := st.chat_input("Ask questions"):
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        if len(prompt) > c.MAX_CHAR_LIMIT:
+            st.warning(
+                f"⚠️ Your input is too long! Please limit your input to {c.MAX_CHAR_LIMIT} characters.")
+            prompt = None  # Reset the prompt so it doesn't get processed further
+        else:
+            # Add user message to chat history
+            st.session_state.messages.append(
+                {"role": "user", "content": prompt})
 
-        # Display user message in chat message container
-        with st.chat_message("user"):
-            st.write(prompt.replace("$", "\$"))
+            # Display user message in chat message container
+            with st.chat_message("user"):
+                st.write(prompt.replace("$", "\$"))
 
-        # Display assistant response in chat message container
-        with st.spinner("Loading..."):
-            with st.chat_message("assistant"):
+            # Display assistant response in chat message container
+            with st.spinner("Loading..."):
+                with st.chat_message("assistant", avatar="✨"):
 
-                qa.model = cfg.llm_options[st.session_state.model].get("llm")
+                    qa.model = cfg.llm_options[st.session_state.model].get(
+                        "llm")
 
-                conversation = st.session_state.selected_conversation or ObjectId()
+                    conversation = st.session_state.selected_conversation or ObjectId()
 
-                try:
-                    response = qa.ask_question(
-                        query=prompt,
-                        session_id=conversation,
-                        stream=True
-                    )
-
-                    content = st.write_stream(
-                        ai_response_wrapper(response)
-                    )
-
-                    # content = st.markdown(response["answer"])
-
-                    st.session_state.messages.append(
-                        {"role": "assistant", "content": content}
-                    )
-
-                    # rerun to rerender sidebar with new conversations as selected_conversation
-                    if conversation not in st.session_state.conversations:
-                        st.session_state.conversations.append(conversation)
-                        st.session_state.selected_conversation = conversation
-                        st.rerun()
-
-                except httpx.ConnectError:
-                    logger.error(e)
-                    llm_option_label = (
-                        cfg.llm_options[st.session_state.model]
-                        .get("label")
-                    )
-
-                    st.warning(
-                        f"Check your `{llm_option_label}` connection"
-                    )
-                except BadRequestError as e:
-                    logger.error(e)
-                    print("e.body", e.body)
-                    print("e.body['message']", e.body['message'])
-                    # print(e.body['innererror']['content_filter_result'])
-                    if e.body.get('code', '') == 'string_above_max_length':
-                        st.error(
-                            'It seems the question is too complex for me to process. '
-                            'Please try splitting it into multiple simpler questions.'
+                    try:
+                        response = qa.ask_question(
+                            query=prompt,
+                            session_id=conversation,
+                            stream=True
                         )
-                    else:
-                        st.error(
-                            "400 Bad Request: The request could not be processed due to invalid input. "
-                            "Please check the format and content of your request and try again."
+
+                        content = st.write_stream(
+                            ai_response_wrapper(response)
                         )
-                except Exception as e:
-                    print('Exception', e)
-                    logger.error(e)
-                    st.error(
-                        "Something went wrong, please try again. "
-                        "If the problem persists, please contact the administrator."
-                    )
+
+                        # content = st.markdown(response["answer"])
+
+                        st.session_state.messages.append(
+                            {"role": "assistant", "content": content}
+                        )
+
+                        # rerun to rerender sidebar with new conversations as selected_conversation
+                        if conversation not in st.session_state.conversations:
+                            st.session_state.conversations.append(conversation)
+                            st.session_state.selected_conversation = conversation
+                            st.rerun()
+
+                    except httpx.ConnectError:
+                        logger.error(e)
+                        llm_option_label = (
+                            cfg.llm_options[st.session_state.model]
+                            .get("label")
+                        )
+
+                        st.warning(
+                            f"Check your `{llm_option_label}` connection"
+                        )
+                    except BadRequestError as e:
+                        logger.error(e)
+                        print("e.body", e.body)
+                        print("e.body['message']", e.body['message'])
+                        # print(e.body['innererror']['content_filter_result'])
+                        if e.body.get('code', '') == 'string_above_max_length':
+                            st.error(
+                                'It seems the question is too complex for me to process. '
+                                'Please try splitting it into multiple simpler questions.'
+                            )
+                        else:
+                            st.error(
+                                "400 Bad Request: The request could not be processed due to invalid input. "
+                                "Please check the format and content of your request and try again."
+                            )
+                    except Exception as e:
+                        print('Exception', e)
+                        logger.error(e)
+                        st.error(
+                            "Something went wrong, please try again. "
+                            "If the problem persists, please contact the administrator."
+                        )
 
 
 def set_up_langsmith_env():
