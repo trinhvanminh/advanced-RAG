@@ -6,12 +6,14 @@ import pytz
 import streamlit as st
 from bson.objectid import ObjectId
 
-import src.config as cfg
 from src.csv_retriever import CSVRetriever
 from src.qna import QnA, QnAResponse
 from src.rag import RAG
 from src.utils.conversation import (create_conversation, delete_conversation,
                                     select_conversation)
+
+import src.config as cfg
+import src.constants as c
 
 
 def ai_response_wrapper(generator: Generator[QnAResponse, None, None]) -> Generator:
@@ -183,7 +185,8 @@ def main():
 
     csv_retriever = CSVRetriever(
         llm=default_model,
-        directory_path='./data/preprocessed/csv/'
+        directory_path=c.AZURE_STORAGE_CONTAINER,
+        connection_string=c.AZURE_STORAGE_CONNECTION_STRING
     )
 
     qa = QnA(
