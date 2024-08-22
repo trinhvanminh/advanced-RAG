@@ -23,3 +23,7 @@ openpyxl==3.1.5
 pymongo==4.8.0
 python-dotenv==1.0.1
 streamlit==1.36.0
+
+azure-storage-blob==12.22.0
+azure-identity==1.17.1
+adlfs==2024.7.0
