@@ -176,8 +176,8 @@ def render_chat(qa: QnA):
 
 
 def main():
-    st.set_page_config(page_title="Mortgage Assistant")
-    st.title("Mortgage Assistant")
+    st.set_page_config(page_title="Mortgage Broker Assistant")
+    st.title("Mortgage Broker Assistant")
 
     default_model = cfg.llm_options['azure-openai'].get('llm')
 
