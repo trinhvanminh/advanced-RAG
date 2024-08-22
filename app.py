@@ -184,7 +184,16 @@ def render_chat(qa: QnA):
                             'Please try splitting it into multiple simpler questions.'
                         )
                     else:
-                        st.error(e.body['message'])
+                        st.error(
+                            "400 Bad Request: The request could not be processed due to invalid input. "
+                            "Please check the format and content of your request and try again."
+                        )
+                except Exception as e:
+                    print('Exception', e)
+                    st.error(
+                        "Something went wrong, please try again. "
+                        "If the problem persists, please contact the administrator."
+                    )
 
 
 def main():
