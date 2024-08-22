@@ -118,8 +118,12 @@ def render_sidebar(qa: QnA):
 def render_chat(qa: QnA):
     # Display chat messages from history on app rerun
     for message in st.session_state.messages:
+        content: str = message.get("content", "").replace("$", "\$")
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            if message["role"] == 'user':
+                st.write(content)
+            else:
+                st.markdown(content)
 
     # Accept user input
     if prompt := st.chat_input("Ask questions"):
@@ -128,7 +132,7 @@ def render_chat(qa: QnA):
 
         # Display user message in chat message container
         with st.chat_message("user"):
-            st.markdown(prompt)
+            st.write(prompt.replace("$", "\$"))
 
         # Display assistant response in chat message container
         with st.spinner("Loading..."):
@@ -185,8 +189,9 @@ def main():
 
     csv_retriever = CSVRetriever(
         llm=default_model,
-        directory_path=c.AZURE_STORAGE_CONTAINER,
-        connection_string=c.AZURE_STORAGE_CONNECTION_STRING
+        # directory_path=c.AZURE_STORAGE_CONTAINER,
+        directory_path='./data/preprocessed/csv/',
+        # connection_string=c.AZURE_STORAGE_CONNECTION_STRING
     )
 
     qa = QnA(
