@@ -8,6 +8,10 @@ import pytz
 import streamlit as st
 from bson.objectid import ObjectId
 from streamlit_feedback import streamlit_feedback
+from langchain.callbacks.tracers.run_collector import RunCollectorCallbackHandler
+from langsmith import Client
+from langchain.schema.runnable import RunnableConfig
+from langchain.callbacks.tracers.langchain import wait_for_all_tracers
 
 from src.csv_retriever import CSVRetriever
 from src.qna import QnA, QnAResponse
@@ -21,20 +25,37 @@ import src.constants as c
 logger = logging.getLogger(__name__)
 
 
+def set_up_langsmith_env():
+    os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
+    os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
+    os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
+    os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
+
+
 def ai_response_wrapper(generator: Generator[QnAResponse, None, None]) -> Generator:
     for chunk in generator:
-
-        # if 'context' in chunk:
-        #     context = chunk['context']
-        #     sources = []
-        #     for doc in context:
-        #         source = doc.metadata.get('source')
-        #         if source not in sources:
-        #             sources.append(source)
-        #     print(sources)
-
         if 'answer' in chunk:
             yield chunk['answer'].replace("$", "\$")
+
+
+def _reset_feedback():
+    st.session_state.feedback_update = None
+    st.session_state.feedback = None
+
+
+def _get_trace_link(client: Client, run_collector: RunCollectorCallbackHandler):
+    # The run collector will store all the runs in order. We'll just take the root and then
+    # reset the list for next interaction.
+    run = run_collector.traced_runs[0]
+    run_collector.traced_runs = []
+    st.session_state.run_id = run.id
+    wait_for_all_tracers()
+    # Requires langsmith >= 0.0.19
+    url = client.share_run(run.id)
+    # Or if you just want to use this internally
+    # without sharing
+    # url = client.read_run(run.id).url
+    st.session_state.trace_link = url
 
 
 def init_session_state(qa: QnA):
@@ -54,6 +75,12 @@ def init_session_state(qa: QnA):
 
     if "model" not in st.session_state:
         st.session_state.model = 'azure-openai'
+
+    if "run_id" not in st.session_state:
+        st.session_state.run_id = None
+
+    if "trace_link" not in st.session_state:
+        st.session_state.trace_link = None
 
 
 def render_sidebar(qa: QnA):
@@ -120,7 +147,7 @@ def render_sidebar(qa: QnA):
                     )
 
 
-def render_chat(qa: QnA):
+def render_chat(qa: QnA, client: Client, run_collector: RunCollectorCallbackHandler):
     # Display chat messages from history on app rerun
     for message in st.session_state.messages:
         content: str = message.get("content", "").replace("$", "\$")
@@ -138,86 +165,146 @@ def render_chat(qa: QnA):
             st.warning(
                 f"⚠️ Your input is too long! Please limit your input to {c.MAX_CHAR_LIMIT} characters.")
             prompt = None  # Reset the prompt so it doesn't get processed further
-        else:
-            # Add user message to chat history
-            st.session_state.messages.append(
-                {"role": "user", "content": prompt})
+            return
 
-            # Display user message in chat message container
-            with st.chat_message("user"):
-                st.write(prompt.replace("$", "\$"))
+        # Add user message to chat history
+        st.session_state.messages.append(
+            {"role": "user", "content": prompt})
 
-            # Display assistant response in chat message container
-            with st.spinner("Loading..."):
-                with st.chat_message("assistant", avatar="✨"):
+        # Display user message in chat message container
+        with st.chat_message("user"):
+            st.write(prompt.replace("$", "\$"))
 
-                    qa.model = cfg.llm_options[st.session_state.model].get(
-                        "llm")
+        _reset_feedback()
 
-                    conversation = st.session_state.selected_conversation or ObjectId()
+        # Display assistant response in chat message container
+        with st.spinner("Loading..."):
+            with st.chat_message("assistant", avatar="✨"):
 
-                    try:
-                        response = qa.ask_question(
-                            query=prompt,
-                            session_id=conversation,
-                            stream=True
-                        )
+                qa.model = cfg.llm_options[st.session_state.model].get(
+                    "llm")
 
-                        content = st.write_stream(
-                            ai_response_wrapper(response)
-                        )
+                conversation = st.session_state.selected_conversation or ObjectId()
 
-                        # content = st.markdown(response["answer"])
+                try:
+                    response = qa.ask_question(
+                        query=prompt,
+                        config=RunnableConfig(
+                            callbacks=[run_collector],
+                            tags=["mortgage-broker-chat"],
+                            configurable={"session_id": conversation}
+                        ),
+                        stream=True
+                    )
 
-                        st.session_state.messages.append(
-                            {"role": "assistant", "content": content}
-                        )
+                    content = st.write_stream(
+                        ai_response_wrapper(response)
+                    )
 
-                        # rerun to rerender sidebar with new conversations as selected_conversation
-                        if conversation not in st.session_state.conversations:
-                            st.session_state.conversations.append(conversation)
-                            st.session_state.selected_conversation = conversation
-                            st.rerun()
+                    # content = st.markdown(response["answer"])
 
-                    except httpx.ConnectError:
-                        logger.error(e)
-                        llm_option_label = (
-                            cfg.llm_options[st.session_state.model]
-                            .get("label")
-                        )
+                    st.session_state.messages.append(
+                        {"role": "assistant", "content": content}
+                    )
 
-                        st.warning(
-                            f"Check your `{llm_option_label}` connection"
-                        )
-                    except BadRequestError as e:
-                        logger.error(e)
-                        print("e.body", e.body)
-                        print("e.body['message']", e.body['message'])
-                        # print(e.body['innererror']['content_filter_result'])
-                        if e.body.get('code', '') == 'string_above_max_length':
-                            st.error(
-                                'It seems the question is too complex for me to process. '
-                                'Please try splitting it into multiple simpler questions.'
-                            )
-                        else:
-                            st.error(
-                                "400 Bad Request: The request could not be processed due to invalid input. "
-                                "Please check the format and content of your request and try again."
-                            )
-                    except Exception as e:
-                        print('Exception', e)
-                        logger.error(e)
+                    _get_trace_link(client, run_collector)
+
+                    # rerun to rerender sidebar with new conversations as selected_conversation
+                    if conversation not in st.session_state.conversations:
+                        st.session_state.conversations.append(conversation)
+                        st.session_state.selected_conversation = conversation
+                        st.rerun()
+
+                except httpx.ConnectError:
+                    logger.error(e)
+                    llm_option_label = (
+                        cfg.llm_options[st.session_state.model]
+                        .get("label")
+                    )
+
+                    st.warning(
+                        f"Check your `{llm_option_label}` connection"
+                    )
+                except BadRequestError as e:
+                    logger.error(e)
+                    print("e.body", e.body)
+                    print("e.body['message']", e.body['message'])
+                    # print(e.body['innererror']['content_filter_result'])
+                    if e.body.get('code', '') == 'string_above_max_length':
                         st.error(
-                            "Something went wrong, please try again. "
-                            "If the problem persists, please contact the administrator."
+                            'It seems the question is too complex for me to process. '
+                            'Please try splitting it into multiple simpler questions.'
                         )
+                    else:
+                        st.error(
+                            "400 Bad Request: The request could not be processed due to invalid input. "
+                            "Please check the format and content of your request and try again."
+                        )
+                except Exception as e:
+                    print('Exception', e)
+                    logger.error(e)
+                    st.error(
+                        "Something went wrong, please try again. "
+                        "If the problem persists, please contact the administrator."
+                    )
 
 
-def set_up_langsmith_env():
-    os.environ["LANGCHAIN_TRACING_V2"] = st.secrets["LANGCHAIN_TRACING_V2"]
-    os.environ["LANGCHAIN_ENDPOINT"] = st.secrets["LANGCHAIN_ENDPOINT"]
-    os.environ["LANGCHAIN_API_KEY"] = st.secrets["LANGCHAIN_API_KEY"]
-    os.environ["LANGCHAIN_PROJECT"] = st.secrets["LANGCHAIN_PROJECT"]
+def render_feedback(client: Client):
+    has_chat_messages = len(st.session_state.get("messages", [])) > 0
+
+    if not has_chat_messages:
+        return
+
+    # st.write(st.session_state.run_id)
+    # st.write(st.session_state.trace_link)
+
+    if st.session_state.get("run_id"):
+        # feedback_option = (
+        #     "faces" if st.toggle(label="`Thumbs` ⇄ `Faces`",
+        #                          value=False) else "thumbs"
+        # )
+        feedback_option = "faces"
+
+        # TODO: streamlit_feedback only return if key is different from previous key else return None
+        # make a difference key each submit
+        # TODO: fix duplicate render after submit
+        feedback = streamlit_feedback(
+            feedback_type=feedback_option,
+            optional_text_label="[Optional] Please provide an explanation",
+            key=f"feedback_{st.session_state.run_id}",
+        )
+
+        score_mappings = {
+            "thumbs": {"👍": 1, "👎": 0},
+            "faces": {"😀": 1, "🙂": 0.75, "😐": 0.5, "🙁": 0.25, "😞": 0},
+        }
+
+        scores = score_mappings[feedback_option]
+
+        if feedback:
+            score = scores.get(feedback["score"])
+
+            if score is not None:
+                # Formulate feedback type string incorporating the feedback option and score value
+                feedback_type_str = f"{feedback_option} {feedback['score']}"
+
+                # Record the feedback with the formulated feedback type string and optional comment
+                feedback_record = client.create_feedback(
+                    st.session_state.run_id,
+                    feedback_type_str,  # Updated feedback type
+                    score=score,
+                    comment=feedback.get("text"),
+                    source_info={
+                        "name": "streamlit"
+                    },
+                )
+                st.session_state.feedback = {
+                    "feedback_id": str(feedback_record.id),
+                    "score": score,
+                }
+
+            else:
+                st.warning("Invalid feedback score.")
 
 
 def main():
@@ -233,9 +320,9 @@ def main():
 
     csv_retriever = CSVRetriever(
         llm=default_model,
-        directory_path=c.AZURE_STORAGE_CONTAINER,
-        # directory_path='./data/preprocessed/csv/',
-        connection_string=c.AZURE_STORAGE_CONNECTION_STRING
+        # directory_path=c.AZURE_STORAGE_CONTAINER,
+        directory_path='./data/preprocessed/csv/',
+        # connection_string=c.AZURE_STORAGE_CONNECTION_STRING
     )
 
     qa = QnA(
@@ -244,9 +331,13 @@ def main():
         data_retriever=csv_retriever
     )
 
+    client = Client()
+    run_collector = RunCollectorCallbackHandler()
+
     init_session_state(qa)
     render_sidebar(qa)
-    render_chat(qa)
+    render_chat(qa, client, run_collector)
+    render_feedback(client)
 
 
 if __name__ == "__main__":
