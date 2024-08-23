@@ -11,6 +11,7 @@ from langchain.tools.retriever import create_retriever_tool
 from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
+from langchain.schema.runnable import RunnableConfig
 
 from langchain_core.retrievers import RetrieverLike, RetrieverOutputLike
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
@@ -168,7 +169,7 @@ class QnA:
 
         return history_aware_retriever
 
-    def ask_question(self, query: str, session_id: str, stream: bool = True) -> Union[QnAResponse, Generator[QnAResponse, None, None]]:
+    def ask_question(self, query: str, config: RunnableConfig, stream: bool = True) -> Union[QnAResponse, Generator[QnAResponse, None, None]]:
         start_time = time.time()
 
         question_answer_chain = create_stuff_documents_chain(
@@ -196,20 +197,12 @@ class QnA:
         if stream:
             response: Generator[QnAResponse, None, None] = conversational_rag_chain.stream(
                 input={"input": query},
-                config={
-                    "configurable": {
-                        "session_id": session_id,
-                    }
-                },
+                config=config,
             )
         else:
             response: QnAResponse = conversational_rag_chain.invoke(
                 input={"input": query},
-                config={
-                    "configurable": {
-                        "session_id": session_id,
-                    }
-                },
+                config=config,
             )
 
         exec_time = time.time() - start_time
